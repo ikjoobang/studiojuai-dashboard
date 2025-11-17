@@ -13,6 +13,7 @@
 **■ 주요 기능:**
 - ✔️ 고객 목록 조회 및 필터링
 - ✔️ 고객 상세 정보 관리 (CRUD)
+- ✔️ 패키지별 SNS 채널 동적 입력
 - ✔️ 실시간 통계 대시보드
 - ✔️ 글래스모피즘 디자인 UI
 - ✔️ 반응형 레이아웃
@@ -28,8 +29,9 @@
 **■ 샌드박스 테스트:**
 - https://3001-if5qavji70fpyq4wva2u5-5c13a017.sandbox.novita.ai
 
-**■ 프로덕션 (예정):**
+**■ 프로덕션:**
 - https://studiojuai-dashboard.pages.dev
+- https://a7b4c585.studiojuai-dashboard.pages.dev (Latest)
 
 **■ Hub 연동:**
 - Hub: https://3000-if5qavji70fpyq4wva2u5-5c13a017.sandbox.novita.ai
@@ -53,7 +55,7 @@ GET /api/clients/:id
 
 # 고객 생성
 POST /api/clients
-Body: { name, type, category, package_id, username, brand_info }
+Body: { name, type, category, package_id, username, channels, brand_info }
 
 # 고객 수정
 PUT /api/clients/:id
@@ -86,6 +88,12 @@ interface Client {
   package_id: 'A' | 'B' | 'C';
   username: string;
   status: 'active' | 'paused' | 'inactive';
+  channels: {
+    instagram?: string;
+    youtube?: string;
+    tiktok?: string;
+    naver_blog?: string;
+  };
   brand_info: {
     industry: string;
     target_audience: string;
@@ -99,8 +107,16 @@ interface Client {
 ### **데모 고객 데이터**
 
 1. **카페 더 라운지** (업체, B 패키지)
-2. **김민지** (개인, A 패키지) 
+   - Instagram: @cafe_lounge
+   - Naver Blog: https://blog.naver.com/cafe_lounge
+
+2. **김민지** (개인, A 패키지)
+   - Instagram: @minji_beauty
+   - YouTube: https://youtube.com/@minjibeauty
+   - TikTok: @minji_beauty_official
+
 3. **피트니스 헬스클럽** (업체, C 패키지)
+   - Instagram: @fitness_healthclub
 
 ### **스토리지 서비스 (예정)**
 
@@ -125,8 +141,13 @@ interface Client {
 
 **■ 고객 추가:**
 1. "고객 추가" 버튼 클릭
-2. 폼 작성 (이름, 유형, 카테고리, 패키지, 아이디)
-3. "추가" 버튼 클릭
+2. 기본 정보 입력 (이름, 유형, 카테고리)
+3. 패키지 선택 (A/B/C)
+4. SNS 채널 정보 입력 (패키지별 자동 표시)
+   - A 패키지: Instagram, YouTube, TikTok
+   - B 패키지: Instagram, Naver Blog
+   - C 패키지: Instagram
+5. "추가" 버튼 클릭
 
 **■ 고객 상세 보기:**
 - 고객 카드 클릭 (개발 예정)
@@ -188,11 +209,16 @@ OPENAI_API_KEY=your_openai_key
 
 ## ❼ 배포 상태
 
-**■ 현재 상태:** ✅ 로컬 개발 완료
+**■ 현재 상태:** ✅ Cloudflare Pages 배포 완료
 
-**■ 배포 플랫폼:** Cloudflare Pages (예정)
+**■ 배포 플랫폼:** Cloudflare Pages
 
 **■ 마지막 업데이트:** 2025-11-17
+
+**■ 최근 배포:**
+- 날짜: 2025-11-17
+- URL: https://a7b4c585.studiojuai-dashboard.pages.dev
+- 변경사항: 패키지별 SNS 채널 입력 필드 추가
 
 **■ 다음 단계:**
 1. Supabase 데이터베이스 연동
@@ -212,11 +238,14 @@ OPENAI_API_KEY=your_openai_key
 ✅ 고객 목록 조회 (데모)  
 ✅ 고객 통계 카드  
 ✅ 필터링 기능 (전체/업체/개인)  
-✅ 고객 추가 모달  
+✅ 고객 추가 모달 (패키지별 동적 채널 필드)  
 ✅ RESTful API (CRUD)  
 ✅ 반응형 디자인  
 ✅ PM2 프로세스 관리  
 ✅ Git 저장소 초기화  
+✅ Cloudflare Pages 배포  
+✅ 모달 UI 개선 (텍스트 가시성)  
+✅ 사이드바 라우팅 수정  
 
 ---
 
