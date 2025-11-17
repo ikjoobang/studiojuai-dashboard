@@ -642,18 +642,18 @@ app.get('/', (c) => {
             
             const channels = packageChannels[packageId] || [];
             
-            container.innerHTML = channels.map(channel => `
+            container.innerHTML = channels.map(channel => \`
                 <div>
-                    <label class="modal-label block text-sm mb-2">${channel.label}</label>
+                    <label class="modal-label block text-sm mb-2">\${channel.label}</label>
                     <input 
                         type="text" 
-                        name="channel_${channel.id}" 
-                        placeholder="${channel.placeholder}"
+                        name="channel_\${channel.id}" 
+                        placeholder="\${channel.placeholder}"
                         required 
                         class="modal-input w-full px-4 py-2 rounded-lg"
                     >
                 </div>
-            `).join('');
+            \`).join('');
         }
         
         // 고객 추가
