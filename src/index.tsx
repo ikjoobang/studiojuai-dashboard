@@ -3,12 +3,12 @@ import { cors } from 'hono/cors'
 import { serveStatic } from 'hono/cloudflare-workers'
 
 // 환경 변수 타입 정의
-type Bindings = {
+type Env = {
   DB: D1Database;
   OPENAI_API_KEY: string;
 }
 
-const app = new Hono<{ Bindings: Bindings }>()
+const app = new Hono<{ Bindings: Env }>()
 
 // CORS 설정
 app.use('/api/*', cors())
@@ -16,165 +16,97 @@ app.use('/api/*', cors())
 // 정적 파일 서빙
 app.use('/static/*', serveStatic({ root: './public' }))
 
-// ===== 데모 데이터 =====
+// ===== 헬퍼 함수 =====
 
-// 작업 데이터
-const demoTasks = [
-  {
-    id: '1',
-    client_id: '1',
-    client_name: '카페 더 라운지',
-    title: '신메뉴 프로모션 영상',
-    description: '봄 시즌 신메뉴 론칭 프로모션용 숏폼 영상 제작',
-    prompt: 'A cozy modern cafe interior showcasing new spring menu items with pastel colors and warm lighting, targeting 20-30s female audience, friendly and comfortable tone.',
-    status: 'in_progress',
-    package_id: 'B',
-    created_at: '2025-11-15',
-    due_date: '2025-11-20'
-  },
-  {
-    id: '2',
-    client_id: '2',
-    client_name: '김민지',
-    title: '뷰티 튜토리얼 콘텐츠',
-    description: '가을 메이크업 튜토리얼 영상 - 데일리 룩',
-    prompt: 'A trendy and lively beauty tutorial showing autumn makeup look, targeting 10-20s audience, fun and friendly tone with vibrant colors.',
-    status: 'completed',
-    package_id: 'A',
-    created_at: '2025-11-10',
-    due_date: '2025-11-17',
-    completed_at: '2025-11-16'
-  },
-  {
-    id: '3',
-    client_id: '1',
-    client_name: '카페 더 라운지',
-    title: '고객 후기 영상',
-    description: '단골 고객 인터뷰 및 매장 분위기 촬영',
-    prompt: '',
-    status: 'pending',
-    package_id: 'B',
-    created_at: '2025-11-17',
-    due_date: '2025-11-25'
-  },
-  {
-    id: '4',
-    client_id: '3',
-    client_name: '피트니스 헬스클럽',
-    title: '회원 모집 광고',
-    description: '11월 회원 모집 이벤트 광고 영상',
-    prompt: 'A dynamic and professional fitness club promotional video showing workout sessions, targeting 20-40s, motivating tone with energetic music.',
-    status: 'pending',
-    package_id: 'C',
-    created_at: '2025-11-17',
-    due_date: '2025-11-22'
+// JSON 문자열을 안전하게 파싱
+function parseJSON(str: string | null) {
+  if (!str) return null;
+  try {
+    return JSON.parse(str);
+  } catch {
+    return null;
   }
-];
-
-// 고객 데이터
-const demoClients = [
-  {
-    id: '1',
-    name: '카페 더 라운지',
-    type: 'brand',
-    category: '카페/음료',
-    package_id: 'B',
-    username: 'cafe_lounge',
-    status: 'active',
-    channels: {
-      instagram: '@cafe_lounge',
-      naver_blog: 'https://blog.naver.com/cafe_lounge'
-    },
-    brand_info: {
-      industry: '카페',
-      target_audience: '20-30대 여성',
-      style: ['모던', '감성적'],
-      tone: '친근하고 편안한'
-    },
-    created_at: '2025-01-10'
-  },
-  {
-    id: '2',
-    name: '김민지',
-    type: 'individual',
-    category: '뷰티/패션',
-    package_id: 'A',
-    username: 'minji_beauty',
-    status: 'active',
-    channels: {
-      instagram: '@minji_beauty',
-      youtube: 'https://youtube.com/@minjibeauty',
-      tiktok: '@minji_beauty_official'
-    },
-    brand_info: {
-      industry: '뷰티 크리에이터',
-      target_audience: '10-20대',
-      style: ['트렌디', '발랄'],
-      tone: '친근하고 재미있는'
-    },
-    created_at: '2025-01-15'
-  },
-  {
-    id: '3',
-    name: '피트니스 헬스클럽',
-    type: 'brand',
-    category: '건강/운동',
-    package_id: 'C',
-    username: 'fitness_club',
-    status: 'paused',
-    channels: {
-      instagram: '@fitness_healthclub'
-    },
-    brand_info: {
-      industry: '피트니스',
-      target_audience: '20-40대',
-      style: ['역동적', '전문적'],
-      tone: '동기부여하는'
-    },
-    created_at: '2025-01-05'
-  }
-];
+}
 
 // ===== API 라우트 =====
 
 // 고객 목록 조회
-app.get('/api/clients', (c) => {
-  const type = c.req.query('type');
-  const status = c.req.query('status');
-  
-  let filtered = [...demoClients];
-  
-  if (type) {
-    filtered = filtered.filter(client => client.type === type);
+app.get('/api/clients', async (c) => {
+  try {
+    const type = c.req.query('type');
+    const status = c.req.query('status');
+    
+    let query = 'SELECT * FROM clients WHERE 1=1';
+    const params: string[] = [];
+    
+    if (type) {
+      query += ' AND type = ?';
+      params.push(type);
+    }
+    
+    if (status) {
+      query += ' AND status = ?';
+      params.push(status);
+    }
+    
+    query += ' ORDER BY created_at DESC';
+    
+    const { results } = await c.env.DB.prepare(query).bind(...params).all();
+    
+    // JSON 필드 파싱
+    const clients = results.map((row: any) => ({
+      ...row,
+      channels: parseJSON(row.channels),
+      brand_info: parseJSON(row.brand_info)
+    }));
+    
+    return c.json({
+      success: true,
+      data: clients,
+      total: clients.length
+    });
+  } catch (error) {
+    console.error('D1 Error:', error);
+    return c.json({
+      success: false,
+      message: '고객 목록 조회에 실패했습니다.',
+      error: String(error)
+    }, 500);
   }
-  
-  if (status) {
-    filtered = filtered.filter(client => client.status === status);
-  }
-  
-  return c.json({
-    success: true,
-    data: filtered,
-    total: filtered.length
-  });
 });
 
 // 고객 상세 조회
-app.get('/api/clients/:id', (c) => {
-  const id = c.req.param('id');
-  const client = demoClients.find(c => c.id === id);
-  
-  if (!client) {
+app.get('/api/clients/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    
+    const { results } = await c.env.DB.prepare(
+      'SELECT * FROM clients WHERE id = ?'
+    ).bind(id).all();
+    
+    if (results.length === 0) {
+      return c.json({
+        success: false,
+        message: '고객을 찾을 수 없습니다.'
+      }, 404);
+    }
+    
+    const client = {
+      ...results[0],
+      channels: parseJSON(results[0].channels),
+      brand_info: parseJSON(results[0].brand_info)
+    };
+    
+    return c.json({
+      success: true,
+      data: client
+    });
+  } catch (error) {
     return c.json({
       success: false,
-      message: '고객을 찾을 수 없습니다.'
-    }, 404);
+      message: '고객 조회에 실패했습니다.'
+    }, 500);
   }
-  
-  return c.json({
-    success: true,
-    data: client
-  });
 });
 
 // 고객 생성
@@ -182,14 +114,29 @@ app.post('/api/clients', async (c) => {
   try {
     const body = await c.req.json();
     
-    const newClient = {
-      id: String(demoClients.length + 1),
-      ...body,
-      status: 'active',
-      created_at: new Date().toISOString().split('T')[0]
-    };
+    const result = await c.env.DB.prepare(`
+      INSERT INTO clients (name, type, category, package_id, username, status, channels, brand_info)
+      VALUES (?, ?, ?, ?, ?, 'active', ?, ?)
+    `).bind(
+      body.name,
+      body.type,
+      body.category,
+      body.package_id,
+      body.username,
+      JSON.stringify(body.channels || {}),
+      JSON.stringify(body.brand_info || {})
+    ).run();
     
-    demoClients.push(newClient);
+    // 생성된 고객 조회
+    const { results } = await c.env.DB.prepare(
+      'SELECT * FROM clients WHERE id = ?'
+    ).bind(result.meta.last_row_id).all();
+    
+    const newClient = {
+      ...results[0],
+      channels: parseJSON(results[0].channels),
+      brand_info: parseJSON(results[0].brand_info)
+    };
     
     return c.json({
       success: true,
@@ -210,23 +157,44 @@ app.put('/api/clients/:id', async (c) => {
     const id = c.req.param('id');
     const body = await c.req.json();
     
-    const index = demoClients.findIndex(client => client.id === id);
+    await c.env.DB.prepare(`
+      UPDATE clients 
+      SET name = ?, type = ?, category = ?, package_id = ?, username = ?, 
+          status = ?, channels = ?, brand_info = ?
+      WHERE id = ?
+    `).bind(
+      body.name,
+      body.type,
+      body.category,
+      body.package_id,
+      body.username,
+      body.status,
+      JSON.stringify(body.channels || {}),
+      JSON.stringify(body.brand_info || {}),
+      id
+    ).run();
     
-    if (index === -1) {
+    // 수정된 고객 조회
+    const { results } = await c.env.DB.prepare(
+      'SELECT * FROM clients WHERE id = ?'
+    ).bind(id).all();
+    
+    if (results.length === 0) {
       return c.json({
         success: false,
         message: '고객을 찾을 수 없습니다.'
       }, 404);
     }
     
-    demoClients[index] = {
-      ...demoClients[index],
-      ...body
+    const updatedClient = {
+      ...results[0],
+      channels: parseJSON(results[0].channels),
+      brand_info: parseJSON(results[0].brand_info)
     };
     
     return c.json({
       success: true,
-      data: demoClients[index],
+      data: updatedClient,
       message: '고객 정보가 수정되었습니다.'
     });
   } catch (error) {
@@ -238,23 +206,31 @@ app.put('/api/clients/:id', async (c) => {
 });
 
 // 고객 삭제
-app.delete('/api/clients/:id', (c) => {
-  const id = c.req.param('id');
-  const index = demoClients.findIndex(client => client.id === id);
-  
-  if (index === -1) {
+app.delete('/api/clients/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    
+    const result = await c.env.DB.prepare(
+      'DELETE FROM clients WHERE id = ?'
+    ).bind(id).run();
+    
+    if (result.meta.changes === 0) {
+      return c.json({
+        success: false,
+        message: '고객을 찾을 수 없습니다.'
+      }, 404);
+    }
+    
+    return c.json({
+      success: true,
+      message: '고객이 삭제되었습니다.'
+    });
+  } catch (error) {
     return c.json({
       success: false,
-      message: '고객을 찾을 수 없습니다.'
-    }, 404);
+      message: '고객 삭제에 실패했습니다.'
+    }, 500);
   }
-  
-  demoClients.splice(index, 1);
-  
-  return c.json({
-    success: true,
-    message: '고객이 삭제되었습니다.'
-  });
 });
 
 // 프롬프트 생성 (OpenAI GPT-4o-mini)
@@ -263,7 +239,24 @@ app.post('/api/prompts/generate', async (c) => {
     const { client_id, request } = await c.req.json();
     const { env } = c;
     
-    const client = demoClients.find(cl => cl.id === client_id);
+    // D1에서 고객 조회
+    const { results } = await c.env.DB.prepare(
+      'SELECT * FROM clients WHERE id = ?'
+    ).bind(client_id).all();
+    
+    if (results.length === 0) {
+      return c.json({
+        success: false,
+        message: '고객을 찾을 수 없습니다.'
+      }, 404);
+    }
+    
+    const clientRow: any = results[0];
+    const client = {
+      ...clientRow,
+      channels: parseJSON(clientRow.channels),
+      brand_info: parseJSON(clientRow.brand_info)
+    };
     
     if (!client) {
       return c.json({
@@ -341,43 +334,67 @@ app.post('/api/prompts/generate', async (c) => {
 // ===== 작업 관리 API =====
 
 // 작업 목록 조회
-app.get('/api/tasks', (c) => {
-  const client_id = c.req.query('client_id');
-  const status = c.req.query('status');
-  
-  let filtered = [...demoTasks];
-  
-  if (client_id) {
-    filtered = filtered.filter(task => task.client_id === client_id);
+app.get('/api/tasks', async (c) => {
+  try {
+    const client_id = c.req.query('client_id');
+    const status = c.req.query('status');
+    
+    let query = 'SELECT * FROM tasks WHERE 1=1';
+    const params: string[] = [];
+    
+    if (client_id) {
+      query += ' AND client_id = ?';
+      params.push(client_id);
+    }
+    
+    if (status) {
+      query += ' AND status = ?';
+      params.push(status);
+    }
+    
+    query += ' ORDER BY created_at DESC';
+    
+    const { results } = await c.env.DB.prepare(query).bind(...params).all();
+    
+    return c.json({
+      success: true,
+      data: results,
+      total: results.length
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      message: '작업 목록 조회에 실패했습니다.'
+    }, 500);
   }
-  
-  if (status) {
-    filtered = filtered.filter(task => task.status === status);
-  }
-  
-  return c.json({
-    success: true,
-    data: filtered,
-    total: filtered.length
-  });
 });
 
 // 작업 상세 조회
-app.get('/api/tasks/:id', (c) => {
-  const id = c.req.param('id');
-  const task = demoTasks.find(t => t.id === id);
-  
-  if (!task) {
+app.get('/api/tasks/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    
+    const { results } = await c.env.DB.prepare(
+      'SELECT * FROM tasks WHERE id = ?'
+    ).bind(id).all();
+    
+    if (results.length === 0) {
+      return c.json({
+        success: false,
+        message: '작업을 찾을 수 없습니다.'
+      }, 404);
+    }
+    
+    return c.json({
+      success: true,
+      data: results[0]
+    });
+  } catch (error) {
     return c.json({
       success: false,
-      message: '작업을 찾을 수 없습니다.'
-    }, 404);
+      message: '작업 조회에 실패했습니다.'
+    }, 500);
   }
-  
-  return c.json({
-    success: true,
-    data: task
-  });
 });
 
 // 작업 생성
@@ -385,18 +402,27 @@ app.post('/api/tasks', async (c) => {
   try {
     const body = await c.req.json();
     
-    const newTask = {
-      id: String(demoTasks.length + 1),
-      ...body,
-      status: 'pending',
-      created_at: new Date().toISOString().split('T')[0]
-    };
+    const result = await c.env.DB.prepare(`
+      INSERT INTO tasks (client_id, client_name, title, description, prompt, status, package_id, due_date)
+      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
+    `).bind(
+      body.client_id,
+      body.client_name,
+      body.title,
+      body.description || '',
+      body.prompt || '',
+      body.package_id,
+      body.due_date || null
+    ).run();
     
-    demoTasks.push(newTask);
+    // 생성된 작업 조회
+    const { results } = await c.env.DB.prepare(
+      'SELECT * FROM tasks WHERE id = ?'
+    ).bind(result.meta.last_row_id).all();
     
     return c.json({
       success: true,
-      data: newTask,
+      data: results[0],
       message: '작업이 추가되었습니다.'
     }, 201);
   } catch (error) {
@@ -413,23 +439,42 @@ app.put('/api/tasks/:id', async (c) => {
     const id = c.req.param('id');
     const body = await c.req.json();
     
-    const index = demoTasks.findIndex(task => task.id === id);
+    // 완료 상태로 변경 시 completed_at 설정
+    const completedAt = body.status === 'completed' ? new Date().toISOString().split('T')[0] : body.completed_at || null;
     
-    if (index === -1) {
+    await c.env.DB.prepare(`
+      UPDATE tasks 
+      SET client_id = ?, client_name = ?, title = ?, description = ?, 
+          prompt = ?, status = ?, package_id = ?, due_date = ?, completed_at = ?
+      WHERE id = ?
+    `).bind(
+      body.client_id,
+      body.client_name,
+      body.title,
+      body.description || '',
+      body.prompt || '',
+      body.status,
+      body.package_id,
+      body.due_date || null,
+      completedAt,
+      id
+    ).run();
+    
+    // 수정된 작업 조회
+    const { results } = await c.env.DB.prepare(
+      'SELECT * FROM tasks WHERE id = ?'
+    ).bind(id).all();
+    
+    if (results.length === 0) {
       return c.json({
         success: false,
         message: '작업을 찾을 수 없습니다.'
       }, 404);
     }
     
-    demoTasks[index] = {
-      ...demoTasks[index],
-      ...body
-    };
-    
     return c.json({
       success: true,
-      data: demoTasks[index],
+      data: results[0],
       message: '작업 정보가 수정되었습니다.'
     });
   } catch (error) {
@@ -441,23 +486,31 @@ app.put('/api/tasks/:id', async (c) => {
 });
 
 // 작업 삭제
-app.delete('/api/tasks/:id', (c) => {
-  const id = c.req.param('id');
-  const index = demoTasks.findIndex(task => task.id === id);
-  
-  if (index === -1) {
+app.delete('/api/tasks/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    
+    const result = await c.env.DB.prepare(
+      'DELETE FROM tasks WHERE id = ?'
+    ).bind(id).run();
+    
+    if (result.meta.changes === 0) {
+      return c.json({
+        success: false,
+        message: '작업을 찾을 수 없습니다.'
+      }, 404);
+    }
+    
+    return c.json({
+      success: true,
+      message: '작업이 삭제되었습니다.'
+    });
+  } catch (error) {
     return c.json({
       success: false,
-      message: '작업을 찾을 수 없습니다.'
-    }, 404);
+      message: '작업 삭제에 실패했습니다.'
+    }, 500);
   }
-  
-  demoTasks.splice(index, 1);
-  
-  return c.json({
-    success: true,
-    message: '작업이 삭제되었습니다.'
-  });
 });
 
 // ===== 페이지 라우트 =====
