@@ -20,6 +20,10 @@ const demoClients = [
     package_id: 'B',
     username: 'cafe_lounge',
     status: 'active',
+    channels: {
+      instagram: '@cafe_lounge',
+      naver_blog: 'https://blog.naver.com/cafe_lounge'
+    },
     brand_info: {
       industry: '카페',
       target_audience: '20-30대 여성',
@@ -36,6 +40,11 @@ const demoClients = [
     package_id: 'A',
     username: 'minji_beauty',
     status: 'active',
+    channels: {
+      instagram: '@minji_beauty',
+      youtube: 'https://youtube.com/@minjibeauty',
+      tiktok: '@minji_beauty_official'
+    },
     brand_info: {
       industry: '뷰티 크리에이터',
       target_audience: '10-20대',
@@ -52,6 +61,9 @@ const demoClients = [
     package_id: 'C',
     username: 'fitness_club',
     status: 'paused',
+    channels: {
+      instagram: '@fitness_healthclub'
+    },
     brand_info: {
       industry: '피트니스',
       target_audience: '20-40대',
@@ -486,15 +498,17 @@ app.get('/', (c) => {
                 </div>
                 <div>
                     <label class="modal-label block text-sm mb-2">패키지</label>
-                    <select name="package_id" required class="modal-input w-full px-4 py-2 rounded-lg">
-                        <option value="A">A 패키지</option>
-                        <option value="B">B 패키지</option>
-                        <option value="C">C 패키지</option>
+                    <select name="package_id" id="packageSelect" required class="modal-input w-full px-4 py-2 rounded-lg" onchange="updateChannelFields()">
+                        <option value="">선택하세요</option>
+                        <option value="A">A 패키지 (Instagram, YouTube, TikTok)</option>
+                        <option value="B">B 패키지 (Instagram, Naver Blog)</option>
+                        <option value="C">C 패키지 (Instagram)</option>
                     </select>
                 </div>
-                <div>
-                    <label class="modal-label block text-sm mb-2">아이디</label>
-                    <input type="text" name="username" required class="modal-input w-full px-4 py-2 rounded-lg">
+                
+                <!-- 동적 SNS 채널 입력 필드 -->
+                <div id="channelFields" class="space-y-4">
+                    <!-- JavaScript로 동적 생성 -->
                 </div>
                 <div class="flex gap-3 mt-6">
                     <button type="button" onclick="closeAddClientModal()" class="flex-1 px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 font-medium transition">
@@ -601,17 +615,70 @@ app.get('/', (c) => {
             document.getElementById('addClientModal').classList.add('hidden');
         }
         
+        // 패키지 선택 시 채널 입력 필드 동적 생성
+        function updateChannelFields() {
+            const packageId = document.getElementById('packageSelect').value;
+            const container = document.getElementById('channelFields');
+            
+            if (!packageId) {
+                container.innerHTML = '';
+                return;
+            }
+            
+            const packageChannels = {
+                'A': [
+                    { id: 'instagram', label: 'Instagram', placeholder: '@username 또는 URL' },
+                    { id: 'youtube', label: 'YouTube', placeholder: 'https://youtube.com/@channel' },
+                    { id: 'tiktok', label: 'TikTok', placeholder: '@username 또는 URL' }
+                ],
+                'B': [
+                    { id: 'instagram', label: 'Instagram', placeholder: '@username 또는 URL' },
+                    { id: 'naver_blog', label: 'Naver Blog', placeholder: 'https://blog.naver.com/...' }
+                ],
+                'C': [
+                    { id: 'instagram', label: 'Instagram', placeholder: '@username 또는 URL' }
+                ]
+            };
+            
+            const channels = packageChannels[packageId] || [];
+            
+            container.innerHTML = channels.map(channel => `
+                <div>
+                    <label class="modal-label block text-sm mb-2">${channel.label}</label>
+                    <input 
+                        type="text" 
+                        name="channel_${channel.id}" 
+                        placeholder="${channel.placeholder}"
+                        required 
+                        class="modal-input w-full px-4 py-2 rounded-lg"
+                    >
+                </div>
+            `).join('');
+        }
+        
         // 고객 추가
         document.getElementById('addClientForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const formData = new FormData(e.target);
+            const packageId = formData.get('package_id');
+            
+            // 채널 정보 수집
+            const channels = {};
+            for (const [key, value] of formData.entries()) {
+                if (key.startsWith('channel_')) {
+                    const channelName = key.replace('channel_', '');
+                    channels[channelName] = value;
+                }
+            }
+            
             const data = {
                 name: formData.get('name'),
                 type: formData.get('type'),
                 category: formData.get('category'),
-                package_id: formData.get('package_id'),
-                username: formData.get('username'),
+                package_id: packageId,
+                username: formData.get('name').toLowerCase().replace(/\s+/g, '_'),
+                channels: channels,
                 brand_info: {
                     industry: formData.get('category'),
                     target_audience: '',
@@ -626,6 +693,7 @@ app.get('/', (c) => {
                     closeAddClientModal();
                     loadClients();
                     e.target.reset();
+                    document.getElementById('channelFields').innerHTML = '';
                 }
             } catch (error) {
                 alert('고객 추가 실패');
