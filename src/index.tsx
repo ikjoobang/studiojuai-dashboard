@@ -214,6 +214,23 @@ app.post('/api/prompts/generate', async (c) => {
   }
 });
 
+// ===== 페이지 라우트 =====
+
+// 업체 관리 페이지
+app.get('/brands', (c) => {
+  return c.redirect('/?type=brand');
+});
+
+// 개인 관리 페이지
+app.get('/individuals', (c) => {
+  return c.redirect('/?type=individual');
+});
+
+// 작업 관리 페이지
+app.get('/tasks', (c) => {
+  return c.html('<h1 style="color: white; padding: 50px; text-align: center;">작업 관리 페이지 (개발 예정)</h1>');
+});
+
 // ===== 메인 페이지 =====
 app.get('/', (c) => {
   return c.html(`
@@ -313,6 +330,29 @@ app.get('/', (c) => {
             background: #2563eb;
             box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
             transform: translateY(-1px);
+        }
+        
+        /* 모달 스타일 */
+        .modal-content {
+            background: white;
+        }
+        
+        .modal-label {
+            color: #374151;
+            font-weight: 500;
+        }
+        
+        .modal-input {
+            background: #f9fafb;
+            border: 1px solid #d1d5db;
+            color: #111827;
+        }
+        
+        .modal-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            ring: 2px;
+            ring-color: rgba(59, 130, 246, 0.2);
         }
     </style>
 </head>
