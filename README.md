@@ -31,7 +31,7 @@
 
 **■ 프로덕션:**
 - https://studiojuai-dashboard.pages.dev
-- https://a7b4c585.studiojuai-dashboard.pages.dev (Latest)
+- https://e3695512.studiojuai-dashboard.pages.dev (Latest - D1 Integrated)
 
 **■ Hub 연동:**
 - Hub: https://3000-if5qavji70fpyq4wva2u5-5c13a017.sandbox.novita.ai
@@ -118,11 +118,14 @@ interface Client {
 3. **피트니스 헬스클럽** (업체, C 패키지)
    - Instagram: @fitness_healthclub
 
-### **스토리지 서비스 (예정)**
+### **스토리지 서비스**
 
-- **Supabase**: 고객 정보, 프롬프트 저장
-- **Cloudflare KV**: 세션 캐시
-- **Cloudflare D1**: 작업 로그
+- ✅ **Cloudflare D1**: 고객 정보, 작업 정보 (SQLite 기반)
+  - Database: `studiojuai-production` (bbb5a632-10a7-4b1e-ba0e-12f945fa9107)
+  - Tables: `clients`, `tasks`
+  - Features: 인덱스, 트리거, JSON 필드
+- ⏳ **Cloudflare KV**: 세션 캐시 (향후 계획)
+- ⏳ **Cloudflare R2**: 파일 저장소 (향후 계획)
 
 ---
 
@@ -169,7 +172,8 @@ interface Client {
 - **Frontend:** HTML + TailwindCSS + Vanilla JS
 - **Icons:** Font Awesome
 - **HTTP Client:** Axios
-- **Database:** Supabase (예정)
+- **Database:** Cloudflare D1 (SQLite)
+- **AI:** OpenAI GPT-4o-mini
 - **Deployment:** Cloudflare Pages
 - **Process Manager:** PM2
 
@@ -200,9 +204,12 @@ curl http://localhost:3001/api/clients
 
 ```bash
 # .dev.vars
-SUPABASE_URL=your_supabase_url
-SUPABASE_ANON_KEY=your_supabase_key
-OPENAI_API_KEY=your_openai_key
+OPENAI_API_KEY=sk-proj-...your_key...
+```
+
+**Cloudflare Secrets (Production):**
+```bash
+npx wrangler pages secret put OPENAI_API_KEY --project-name studiojuai-dashboard
 ```
 
 ---
@@ -217,16 +224,18 @@ OPENAI_API_KEY=your_openai_key
 
 **■ 최근 배포:**
 - 날짜: 2025-11-17
-- URL: https://a7b4c585.studiojuai-dashboard.pages.dev
-- 변경사항: 패키지별 SNS 채널 입력 필드 추가
+- URL: https://e3695512.studiojuai-dashboard.pages.dev
+- 변경사항: **Cloudflare D1 데이터베이스 통합 완료** ✅
+  - 인메모리 데이터 → D1 영구 저장소로 마이그레이션
+  - clients, tasks 테이블 생성 및 시드 데이터 주입
+  - 모든 API 엔드포인트 D1 연동 완료
+  - OpenAI GPT-4o-mini 프롬프트 생성 통합
 
 **■ 다음 단계:**
-1. Supabase 데이터베이스 연동
-2. OpenAI API 프롬프트 생성
-3. 고객 상세 페이지 구현
-4. 작업 관리 페이지 구현
-5. GitHub 푸시
-6. Cloudflare Pages 배포
+1. ⏳ MP4 Generator / Video Automation System
+2. ⏳ 고급 필터링 및 검색 기능
+3. ⏳ 데이터 분석 및 리포트 생성
+4. ⏳ 실시간 알림 시스템
 
 ---
 
@@ -246,35 +255,54 @@ OPENAI_API_KEY=your_openai_key
 ✅ Cloudflare Pages 배포  
 ✅ 모달 UI 개선 (텍스트 가시성)  
 ✅ 사이드바 라우팅 수정  
+✅ **작업 관리 페이지 전체 구현**  
+✅ **Cloudflare D1 데이터베이스 통합**  
+✅ **OpenAI GPT-4o-mini 프롬프트 생성**  
+✅ **종합 시스템 테스트 완료**  
 
 ---
 
 ## ❾ 미구현 기능
 
-⏳ Supabase 실제 데이터 연동  
-⏳ OpenAI GPT-4 Mini 프롬프트 생성  
-⏳ 고객 상세 페이지  
-⏳ 작업 관리 페이지  
+⏳ 고객 상세 페이지 (모달 확장)  
+⏳ MP4 Generator / Video Automation System  
 ⏳ 콘텐츠 관리 페이지  
 ⏳ 통계 차트 (Chart.js)  
-⏳ 검색 기능  
+⏳ 고급 검색 기능  
 ⏳ 페이지네이션  
-⏳ 파일 업로드  
-⏳ 알림 시스템  
+⏳ 파일 업로드 (Cloudflare R2)  
+⏳ 실시간 알림 시스템  
 
 ---
 
-## ❿ 추천 개발 순서
+## ❿ 완료된 주요 마일스톤
 
-1. **Supabase 설정** (clients 테이블)
-2. **API 실제 연동** (Supabase CRUD)
-3. **OpenAI 통합** (프롬프트 생성)
-4. **고객 상세 페이지** (전체 정보 표시)
-5. **작업 관리 페이지** (Task CRUD)
-6. **콘텐츠 관리** (MP4 시스템 연동)
-7. **통계 대시보드** (Chart.js 차트)
-8. **GitHub 푸시**
-9. **Cloudflare 배포**
+1. ✅ **Cloudflare D1 데이터베이스 설정**
+   - `clients` 테이블 (고객 정보)
+   - `tasks` 테이블 (작업 정보)
+   - 인덱스, 트리거, JSON 필드 지원
+
+2. ✅ **API 실제 연동**
+   - Cloudflare D1 CRUD 완료
+   - 모든 API 엔드포인트 D1 연동
+
+3. ✅ **OpenAI 통합**
+   - GPT-4o-mini 프롬프트 자동 생성
+   - 고객 정보 기반 맞춤형 프롬프트
+
+4. ✅ **작업 관리 페이지**
+   - Task CRUD 완료
+   - 상태별 필터링
+   - 통계 대시보드
+
+5. ✅ **종합 테스트**
+   - 프론트엔드, 백엔드, 데이터베이스 검증
+   - API 응답, 미들웨어, 보안 테스트
+   - TXT/PDF 리포트 생성
+
+6. ✅ **GitHub & Cloudflare 배포**
+   - Git 저장소 관리
+   - Cloudflare Pages 프로덕션 배포
 
 ---
 
