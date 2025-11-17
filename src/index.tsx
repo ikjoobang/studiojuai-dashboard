@@ -426,41 +426,41 @@ app.get('/', (c) => {
     
     <!-- 고객 추가 모달 (간단 버전) -->
     <div id="addClientModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="glass-card rounded-2xl p-8 max-w-md w-full">
-            <h3 class="text-2xl font-bold text-white mb-6">새 고객 추가</h3>
+        <div class="modal-content rounded-2xl p-8 max-w-md w-full shadow-2xl">
+            <h3 class="text-2xl font-bold text-gray-900 mb-6">새 고객 추가</h3>
             <form id="addClientForm" class="space-y-4">
                 <div>
-                    <label class="block text-sm text-gray-300 mb-2">고객명</label>
-                    <input type="text" name="name" required class="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white">
+                    <label class="modal-label block text-sm mb-2">고객명</label>
+                    <input type="text" name="name" required class="modal-input w-full px-4 py-2 rounded-lg">
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-300 mb-2">유형</label>
-                    <select name="type" required class="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white">
+                    <label class="modal-label block text-sm mb-2">유형</label>
+                    <select name="type" required class="modal-input w-full px-4 py-2 rounded-lg">
                         <option value="brand">업체</option>
                         <option value="individual">개인</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-300 mb-2">카테고리</label>
-                    <input type="text" name="category" required class="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white">
+                    <label class="modal-label block text-sm mb-2">카테고리</label>
+                    <input type="text" name="category" required class="modal-input w-full px-4 py-2 rounded-lg">
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-300 mb-2">패키지</label>
-                    <select name="package_id" required class="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white">
+                    <label class="modal-label block text-sm mb-2">패키지</label>
+                    <select name="package_id" required class="modal-input w-full px-4 py-2 rounded-lg">
                         <option value="A">A 패키지</option>
                         <option value="B">B 패키지</option>
                         <option value="C">C 패키지</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-300 mb-2">아이디</label>
-                    <input type="text" name="username" required class="w-full px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-white">
+                    <label class="modal-label block text-sm mb-2">아이디</label>
+                    <input type="text" name="username" required class="modal-input w-full px-4 py-2 rounded-lg">
                 </div>
                 <div class="flex gap-3 mt-6">
-                    <button type="button" onclick="closeAddClientModal()" class="flex-1 px-4 py-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10">
+                    <button type="button" onclick="closeAddClientModal()" class="flex-1 px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 font-medium transition">
                         취소
                     </button>
-                    <button type="submit" class="flex-1 btn-primary px-4 py-2 rounded-lg text-white">
+                    <button type="submit" class="flex-1 btn-primary px-4 py-2 rounded-lg text-white font-medium">
                         추가
                     </button>
                 </div>
@@ -591,6 +591,32 @@ app.get('/', (c) => {
                 alert('고객 추가 실패');
             }
         });
+        
+        // 페이지 전환
+        function showPage(page) {
+            // 사이드바 활성화 상태 변경
+            document.querySelectorAll('.sidebar-item').forEach(item => {
+                item.classList.remove('active', 'text-white');
+                item.classList.add('text-gray-400');
+            });
+            
+            event.target.closest('.sidebar-item').classList.add('active', 'text-white');
+            event.target.closest('.sidebar-item').classList.remove('text-gray-400');
+            
+            // 페이지별 동작
+            if (page === 'dashboard') {
+                currentFilter = 'all';
+                renderClients();
+            } else if (page === 'brands') {
+                currentFilter = 'brand';
+                renderClients();
+            } else if (page === 'individuals') {
+                currentFilter = 'individual';
+                renderClients();
+            } else if (page === 'tasks') {
+                alert('작업 관리 페이지 (개발 예정)');
+            }
+        }
         
         // 로그아웃
         function logout() {
