@@ -11,6 +11,61 @@ app.use('/api/*', cors())
 app.use('/static/*', serveStatic({ root: './public' }))
 
 // ===== 데모 데이터 =====
+
+// 작업 데이터
+const demoTasks = [
+  {
+    id: '1',
+    client_id: '1',
+    client_name: '카페 더 라운지',
+    title: '신메뉴 프로모션 영상',
+    description: '봄 시즌 신메뉴 론칭 프로모션용 숏폼 영상 제작',
+    prompt: 'A cozy modern cafe interior showcasing new spring menu items with pastel colors and warm lighting, targeting 20-30s female audience, friendly and comfortable tone.',
+    status: 'in_progress',
+    package_id: 'B',
+    created_at: '2025-11-15',
+    due_date: '2025-11-20'
+  },
+  {
+    id: '2',
+    client_id: '2',
+    client_name: '김민지',
+    title: '뷰티 튜토리얼 콘텐츠',
+    description: '가을 메이크업 튜토리얼 영상 - 데일리 룩',
+    prompt: 'A trendy and lively beauty tutorial showing autumn makeup look, targeting 10-20s audience, fun and friendly tone with vibrant colors.',
+    status: 'completed',
+    package_id: 'A',
+    created_at: '2025-11-10',
+    due_date: '2025-11-17',
+    completed_at: '2025-11-16'
+  },
+  {
+    id: '3',
+    client_id: '1',
+    client_name: '카페 더 라운지',
+    title: '고객 후기 영상',
+    description: '단골 고객 인터뷰 및 매장 분위기 촬영',
+    prompt: '',
+    status: 'pending',
+    package_id: 'B',
+    created_at: '2025-11-17',
+    due_date: '2025-11-25'
+  },
+  {
+    id: '4',
+    client_id: '3',
+    client_name: '피트니스 헬스클럽',
+    title: '회원 모집 광고',
+    description: '11월 회원 모집 이벤트 광고 영상',
+    prompt: 'A dynamic and professional fitness club promotional video showing workout sessions, targeting 20-40s, motivating tone with energetic music.',
+    status: 'pending',
+    package_id: 'C',
+    created_at: '2025-11-17',
+    due_date: '2025-11-22'
+  }
+];
+
+// 고객 데이터
 const demoClients = [
   {
     id: '1',
@@ -226,6 +281,128 @@ app.post('/api/prompts/generate', async (c) => {
   }
 });
 
+// ===== 작업 관리 API =====
+
+// 작업 목록 조회
+app.get('/api/tasks', (c) => {
+  const client_id = c.req.query('client_id');
+  const status = c.req.query('status');
+  
+  let filtered = [...demoTasks];
+  
+  if (client_id) {
+    filtered = filtered.filter(task => task.client_id === client_id);
+  }
+  
+  if (status) {
+    filtered = filtered.filter(task => task.status === status);
+  }
+  
+  return c.json({
+    success: true,
+    data: filtered,
+    total: filtered.length
+  });
+});
+
+// 작업 상세 조회
+app.get('/api/tasks/:id', (c) => {
+  const id = c.req.param('id');
+  const task = demoTasks.find(t => t.id === id);
+  
+  if (!task) {
+    return c.json({
+      success: false,
+      message: '작업을 찾을 수 없습니다.'
+    }, 404);
+  }
+  
+  return c.json({
+    success: true,
+    data: task
+  });
+});
+
+// 작업 생성
+app.post('/api/tasks', async (c) => {
+  try {
+    const body = await c.req.json();
+    
+    const newTask = {
+      id: String(demoTasks.length + 1),
+      ...body,
+      status: 'pending',
+      created_at: new Date().toISOString().split('T')[0]
+    };
+    
+    demoTasks.push(newTask);
+    
+    return c.json({
+      success: true,
+      data: newTask,
+      message: '작업이 추가되었습니다.'
+    }, 201);
+  } catch (error) {
+    return c.json({
+      success: false,
+      message: '작업 추가에 실패했습니다.'
+    }, 500);
+  }
+});
+
+// 작업 수정
+app.put('/api/tasks/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    
+    const index = demoTasks.findIndex(task => task.id === id);
+    
+    if (index === -1) {
+      return c.json({
+        success: false,
+        message: '작업을 찾을 수 없습니다.'
+      }, 404);
+    }
+    
+    demoTasks[index] = {
+      ...demoTasks[index],
+      ...body
+    };
+    
+    return c.json({
+      success: true,
+      data: demoTasks[index],
+      message: '작업 정보가 수정되었습니다.'
+    });
+  } catch (error) {
+    return c.json({
+      success: false,
+      message: '작업 수정에 실패했습니다.'
+    }, 500);
+  }
+});
+
+// 작업 삭제
+app.delete('/api/tasks/:id', (c) => {
+  const id = c.req.param('id');
+  const index = demoTasks.findIndex(task => task.id === id);
+  
+  if (index === -1) {
+    return c.json({
+      success: false,
+      message: '작업을 찾을 수 없습니다.'
+    }, 404);
+  }
+  
+  demoTasks.splice(index, 1);
+  
+  return c.json({
+    success: true,
+    message: '작업이 삭제되었습니다.'
+  });
+});
+
 // ===== 페이지 라우트 =====
 
 // 업체 관리 페이지
@@ -240,7 +417,607 @@ app.get('/individuals', (c) => {
 
 // 작업 관리 페이지
 app.get('/tasks', (c) => {
-  return c.html('<h1 style="color: white; padding: 50px; text-align: center;">작업 관리 페이지 (개발 예정)</h1>');
+  return c.html(`
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudioJuAI - 작업 관리</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+        
+        * {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            min-height: 100vh;
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+        }
+        
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .sidebar {
+            background: rgba(26, 26, 46, 0.8);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .sidebar-item {
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            padding-left: 2rem;
+        }
+        
+        .sidebar-item.active {
+            background: linear-gradient(90deg, rgba(102, 126, 234, 0.2) 0%, transparent 100%);
+            border-left: 3px solid #667eea;
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.375rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .status-pending {
+            background: rgba(234, 179, 8, 0.2);
+            color: #fbbf24;
+        }
+        
+        .status-in_progress {
+            background: rgba(59, 130, 246, 0.2);
+            color: #60a5fa;
+        }
+        
+        .status-completed {
+            background: rgba(34, 197, 94, 0.2);
+            color: #4ade80;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        .status-pending .status-dot {
+            background: #fbbf24;
+        }
+        
+        .status-in_progress .status-dot {
+            background: #60a5fa;
+        }
+        
+        .status-completed .status-dot {
+            background: #4ade80;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .filter-btn {
+            transition: all 0.3s ease;
+        }
+        
+        .filter-btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        /* Modal styles */
+        .modal-content {
+            background: white;
+        }
+        
+        .modal-label {
+            color: #374151;
+            font-weight: 500;
+        }
+        
+        .modal-input {
+            background: #f9fafb;
+            border: 1px solid #d1d5db;
+            color: #111827;
+        }
+        
+        .modal-input:focus {
+            outline: none;
+            border-color: #3b82f6;
+            ring: 2px;
+            ring-color: rgba(59, 130, 246, 0.2);
+        }
+        
+        .modal-textarea {
+            background: #f9fafb;
+            border: 1px solid #d1d5db;
+            color: #111827;
+            min-height: 100px;
+        }
+        
+        .modal-textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            ring: 2px;
+            ring-color: rgba(59, 130, 246, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside class="sidebar w-64 p-6 flex flex-col">
+            <div class="mb-8">
+                <h1 class="text-2xl font-bold text-white">StudioJuAI</h1>
+                <p class="text-gray-400 text-sm mt-1">Dashboard</p>
+            </div>
+            
+            <nav class="flex-1">
+                <a href="/" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 mb-2">
+                    <i class="fas fa-home w-5"></i>
+                    <span>대시보드</span>
+                </a>
+                <a href="/brands" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 mb-2">
+                    <i class="fas fa-building w-5"></i>
+                    <span>업체 관리</span>
+                </a>
+                <a href="/individuals" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 mb-2">
+                    <i class="fas fa-user w-5"></i>
+                    <span>개인 관리</span>
+                </a>
+                <a href="/tasks" class="sidebar-item active flex items-center gap-3 px-4 py-3 rounded-lg text-white mb-2">
+                    <i class="fas fa-tasks w-5"></i>
+                    <span>작업 관리</span>
+                </a>
+            </nav>
+            
+            <button onclick="logout()" class="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-white/5 transition">
+                <i class="fas fa-sign-out-alt w-5"></i>
+                <span>로그아웃</span>
+            </button>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="flex-1 p-8 overflow-y-auto">
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-white mb-2">작업 관리</h2>
+                <p class="text-gray-400">진행 중인 작업과 프로젝트를 관리하세요</p>
+            </header>
+            
+            <!-- 통계 카드 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="glass-card rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">전체 작업</p>
+                            <p class="text-3xl font-bold text-white mt-2" id="totalTasks">0</p>
+                        </div>
+                        <div class="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-clipboard-list text-blue-400 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="glass-card rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">대기 중</p>
+                            <p class="text-3xl font-bold text-yellow-400 mt-2" id="pendingTasks">0</p>
+                        </div>
+                        <div class="w-12 h-12 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-clock text-yellow-400 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="glass-card rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">진행 중</p>
+                            <p class="text-3xl font-bold text-blue-400 mt-2" id="inProgressTasks">0</p>
+                        </div>
+                        <div class="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-spinner text-blue-400 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="glass-card rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">완료</p>
+                            <p class="text-3xl font-bold text-green-400 mt-2" id="completedTasks">0</p>
+                        </div>
+                        <div class="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-check-circle text-green-400 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 필터 및 추가 버튼 -->
+            <div class="flex flex-wrap gap-4 mb-6">
+                <button onclick="filterTasks('all')" class="filter-btn active px-4 py-2 rounded-lg bg-blue-500 text-white">
+                    전체
+                </button>
+                <button onclick="filterTasks('pending')" class="filter-btn px-4 py-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10">
+                    대기 중
+                </button>
+                <button onclick="filterTasks('in_progress')" class="filter-btn px-4 py-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10">
+                    진행 중
+                </button>
+                <button onclick="filterTasks('completed')" class="filter-btn px-4 py-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10">
+                    완료
+                </button>
+                
+                <button onclick="openAddTaskModal()" class="btn-primary ml-auto px-6 py-2 rounded-lg text-white font-medium">
+                    <i class="fas fa-plus mr-2"></i>
+                    작업 추가
+                </button>
+            </div>
+            
+            <!-- 작업 목록 -->
+            <div id="tasksList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- JavaScript로 동적 생성 -->
+            </div>
+        </main>
+    </div>
+    
+    <!-- 작업 추가 모달 -->
+    <div id="addTaskModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="modal-content rounded-2xl p-8 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 class="text-2xl font-bold text-gray-900 mb-6">새 작업 추가</h3>
+            <form id="addTaskForm" class="space-y-4">
+                <div>
+                    <label class="modal-label block text-sm mb-2">고객 선택 *</label>
+                    <select name="client_id" id="clientSelect" required class="modal-input w-full px-4 py-2 rounded-lg" onchange="updateClientInfo()">
+                        <option value="">선택하세요</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1" id="clientInfo"></p>
+                </div>
+                
+                <div>
+                    <label class="modal-label block text-sm mb-2">작업 제목 *</label>
+                    <input type="text" name="title" required placeholder="예: 신제품 프로모션 영상" class="modal-input w-full px-4 py-2 rounded-lg">
+                </div>
+                
+                <div>
+                    <label class="modal-label block text-sm mb-2">작업 설명 *</label>
+                    <textarea name="description" required placeholder="작업에 대한 상세한 설명을 입력하세요" class="modal-textarea w-full px-4 py-2 rounded-lg"></textarea>
+                </div>
+                
+                <div>
+                    <label class="modal-label block text-sm mb-2">마감일</label>
+                    <input type="date" name="due_date" class="modal-input w-full px-4 py-2 rounded-lg">
+                </div>
+                
+                <div>
+                    <label class="modal-label block text-sm mb-2">프롬프트 (선택)</label>
+                    <textarea name="prompt" placeholder="AI 프롬프트를 입력하거나 자동 생성" class="modal-textarea w-full px-4 py-2 rounded-lg"></textarea>
+                    <button type="button" onclick="generatePrompt()" class="mt-2 text-sm text-blue-600 hover:text-blue-700">
+                        <i class="fas fa-magic mr-1"></i>
+                        프롬프트 자동 생성
+                    </button>
+                </div>
+                
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="closeAddTaskModal()" class="flex-1 px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 font-medium transition">
+                        취소
+                    </button>
+                    <button type="submit" class="flex-1 btn-primary px-4 py-2 rounded-lg text-white font-medium">
+                        추가
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <script>
+        let allTasks = [];
+        let allClients = [];
+        let currentFilter = 'all';
+        
+        // 초기 로드
+        async function loadData() {
+            try {
+                // 작업 목록 로드
+                const tasksResponse = await axios.get('/api/tasks');
+                allTasks = tasksResponse.data.data;
+                
+                // 고객 목록 로드
+                const clientsResponse = await axios.get('/api/clients');
+                allClients = clientsResponse.data.data;
+                
+                updateStats();
+                renderTasks();
+                populateClientSelect();
+            } catch (error) {
+                console.error('데이터 로드 실패:', error);
+            }
+        }
+        
+        // 통계 업데이트
+        function updateStats() {
+            document.getElementById('totalTasks').textContent = allTasks.length;
+            document.getElementById('pendingTasks').textContent = allTasks.filter(t => t.status === 'pending').length;
+            document.getElementById('inProgressTasks').textContent = allTasks.filter(t => t.status === 'in_progress').length;
+            document.getElementById('completedTasks').textContent = allTasks.filter(t => t.status === 'completed').length;
+        }
+        
+        // 작업 목록 렌더링
+        function renderTasks() {
+            const container = document.getElementById('tasksList');
+            
+            let filtered = allTasks;
+            if (currentFilter !== 'all') {
+                filtered = allTasks.filter(t => t.status === currentFilter);
+            }
+            
+            if (filtered.length === 0) {
+                container.innerHTML = '<p class="col-span-full text-center text-gray-400 py-12">표시할 작업이 없습니다.</p>';
+                return;
+            }
+            
+            container.innerHTML = filtered.map(task => \`
+                <div class="glass-card rounded-xl p-6">
+                    <div class="flex items-start justify-between mb-4">
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold text-white mb-1">\${task.title}</h3>
+                            <p class="text-sm text-gray-400">\${task.client_name}</p>
+                        </div>
+                        <span class="status-badge status-\${task.status}">
+                            <span class="status-dot"></span>
+                            \${getStatusText(task.status)}
+                        </span>
+                    </div>
+                    
+                    <p class="text-sm text-gray-300 mb-4 line-clamp-2">\${task.description}</p>
+                    
+                    <div class="space-y-2 text-sm mb-4">
+                        <div class="flex items-center gap-2 text-gray-400">
+                            <i class="fas fa-box w-4"></i>
+                            <span>\${task.package_id} 패키지</span>
+                        </div>
+                        <div class="flex items-center gap-2 text-gray-400">
+                            <i class="fas fa-calendar w-4"></i>
+                            <span>마감: \${task.due_date || '미정'}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-2 pt-4 border-t border-white/10">
+                        <button onclick="viewTask('\${task.id}')" class="flex-1 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-white text-sm transition">
+                            <i class="fas fa-eye mr-1"></i>
+                            상세
+                        </button>
+                        <button onclick="changeStatus('\${task.id}', '\${getNextStatus(task.status)}')" class="flex-1 px-3 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-sm transition">
+                            <i class="fas fa-arrow-right mr-1"></i>
+                            \${getNextStatusText(task.status)}
+                        </button>
+                    </div>
+                </div>
+            \`).join('');
+        }
+        
+        // 상태 텍스트 변환
+        function getStatusText(status) {
+            const statusMap = {
+                'pending': '대기 중',
+                'in_progress': '진행 중',
+                'completed': '완료'
+            };
+            return statusMap[status] || status;
+        }
+        
+        // 다음 상태
+        function getNextStatus(currentStatus) {
+            const statusFlow = {
+                'pending': 'in_progress',
+                'in_progress': 'completed',
+                'completed': 'completed'
+            };
+            return statusFlow[currentStatus];
+        }
+        
+        // 다음 상태 버튼 텍스트
+        function getNextStatusText(currentStatus) {
+            const textMap = {
+                'pending': '시작',
+                'in_progress': '완료',
+                'completed': '완료됨'
+            };
+            return textMap[currentStatus] || '변경';
+        }
+        
+        // 상태 변경
+        async function changeStatus(taskId, newStatus) {
+            try {
+                const task = allTasks.find(t => t.id === taskId);
+                if (task.status === 'completed') {
+                    alert('이미 완료된 작업입니다.');
+                    return;
+                }
+                
+                const updateData = { status: newStatus };
+                if (newStatus === 'completed') {
+                    updateData.completed_at = new Date().toISOString().split('T')[0];
+                }
+                
+                const response = await axios.put(\`/api/tasks/\${taskId}\`, updateData);
+                
+                if (response.data.success) {
+                    loadData();
+                }
+            } catch (error) {
+                alert('상태 변경 실패');
+            }
+        }
+        
+        // 필터 적용
+        function filterTasks(status) {
+            currentFilter = status;
+            
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-blue-500', 'text-white');
+                btn.classList.add('bg-white/5', 'text-gray-400');
+            });
+            
+            event.target.classList.add('active', 'bg-blue-500', 'text-white');
+            event.target.classList.remove('bg-white/5', 'text-gray-400');
+            
+            renderTasks();
+        }
+        
+        // 작업 상세 보기
+        function viewTask(id) {
+            const task = allTasks.find(t => t.id === id);
+            if (task) {
+                alert(\`작업 상세 정보:\\n\\n제목: \${task.title}\\n고객: \${task.client_name}\\n설명: \${task.description}\\n프롬프트: \${task.prompt || '없음'}\`);
+            }
+        }
+        
+        // 고객 선택 목록 채우기
+        function populateClientSelect() {
+            const select = document.getElementById('clientSelect');
+            select.innerHTML = '<option value="">선택하세요</option>' + 
+                allClients.map(client => \`
+                    <option value="\${client.id}" data-package="\${client.package_id}" data-name="\${client.name}">
+                        \${client.name} (\${client.type === 'brand' ? '업체' : '개인'} - \${client.package_id} 패키지)
+                    </option>
+                \`).join('');
+        }
+        
+        // 고객 정보 업데이트
+        function updateClientInfo() {
+            const select = document.getElementById('clientSelect');
+            const selectedOption = select.options[select.selectedIndex];
+            const info = document.getElementById('clientInfo');
+            
+            if (selectedOption.value) {
+                const packageId = selectedOption.dataset.package;
+                info.textContent = \`선택됨: \${selectedOption.dataset.name} (\${packageId} 패키지)\`;
+                info.classList.remove('text-gray-500');
+                info.classList.add('text-blue-600');
+            } else {
+                info.textContent = '';
+            }
+        }
+        
+        // 프롬프트 자동 생성
+        async function generatePrompt() {
+            const clientId = document.getElementById('clientSelect').value;
+            const description = document.querySelector('[name="description"]').value;
+            
+            if (!clientId || !description) {
+                alert('고객과 작업 설명을 먼저 입력해주세요.');
+                return;
+            }
+            
+            try {
+                const response = await axios.post('/api/prompts/generate', {
+                    client_id: clientId,
+                    request: description
+                });
+                
+                if (response.data.success) {
+                    document.querySelector('[name="prompt"]').value = response.data.prompt;
+                }
+            } catch (error) {
+                alert('프롬프트 생성 실패');
+            }
+        }
+        
+        // 모달 열기/닫기
+        function openAddTaskModal() {
+            document.getElementById('addTaskModal').classList.remove('hidden');
+        }
+        
+        function closeAddTaskModal() {
+            document.getElementById('addTaskModal').classList.add('hidden');
+            document.getElementById('addTaskForm').reset();
+            document.getElementById('clientInfo').textContent = '';
+        }
+        
+        // 작업 추가
+        document.getElementById('addTaskForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const clientId = formData.get('client_id');
+            const client = allClients.find(c => c.id === clientId);
+            
+            if (!client) {
+                alert('고객을 선택해주세요.');
+                return;
+            }
+            
+            const data = {
+                client_id: clientId,
+                client_name: client.name,
+                title: formData.get('title'),
+                description: formData.get('description'),
+                prompt: formData.get('prompt') || '',
+                due_date: formData.get('due_date') || null,
+                package_id: client.package_id
+            };
+            
+            try {
+                const response = await axios.post('/api/tasks', data);
+                if (response.data.success) {
+                    closeAddTaskModal();
+                    loadData();
+                }
+            } catch (error) {
+                alert('작업 추가 실패');
+            }
+        });
+        
+        // 로그아웃
+        function logout() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            window.location.href = 'https://studiojuai-hub.pages.dev';
+        }
+        
+        // 페이지 로드 시 실행
+        loadData();
+    </script>
+</body>
+</html>
+  `);
 });
 
 // ===== 메인 페이지 =====
