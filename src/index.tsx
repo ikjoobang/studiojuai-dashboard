@@ -444,19 +444,16 @@ app.put('/api/tasks/:id', async (c) => {
     
     await c.env.DB.prepare(`
       UPDATE tasks 
-      SET client_id = ?, client_name = ?, title = ?, description = ?, 
-          prompt = ?, status = ?, package_id = ?, due_date = ?, completed_at = ?
+      SET title = ?, description = ?, prompt = ?, status = ?, due_date = ?, completed_at = ?, notes = ?
       WHERE id = ?
     `).bind(
-      body.client_id,
-      body.client_name,
       body.title,
       body.description || '',
       body.prompt || '',
       body.status,
-      body.package_id,
       body.due_date || null,
       completedAt,
+      body.notes || null,
       id
     ).run();
     
@@ -855,11 +852,87 @@ app.get('/tasks', (c) => {
         </div>
     </div>
     
+    <!-- 작업 상세/편집 모달 -->
+    <div id="taskDetailModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="modal-content rounded-2xl p-8 max-w-3xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-2xl font-bold text-gray-900">작업 상세 정보</h3>
+                <button onclick="closeTaskDetailModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <form id="editTaskForm" class="space-y-4">
+                <input type="hidden" id="editTaskId" name="id">
+                
+                <div>
+                    <label class="modal-label block text-sm mb-2">작업 제목 *</label>
+                    <input type="text" id="editTitle" name="title" required class="modal-input w-full px-4 py-2 rounded-lg">
+                </div>
+                
+                <div>
+                    <label class="modal-label block text-sm mb-2">작업 설명 *</label>
+                    <textarea id="editDescription" name="description" required class="modal-textarea w-full px-4 py-2 rounded-lg" rows="4"></textarea>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="modal-label block text-sm mb-2">고객</label>
+                        <input type="text" id="editClientName" disabled class="modal-input w-full px-4 py-2 rounded-lg bg-gray-100">
+                    </div>
+                    <div>
+                        <label class="modal-label block text-sm mb-2">패키지</label>
+                        <input type="text" id="editPackage" disabled class="modal-input w-full px-4 py-2 rounded-lg bg-gray-100">
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="modal-label block text-sm mb-2">마감일</label>
+                        <input type="date" id="editDueDate" name="due_date" class="modal-input w-full px-4 py-2 rounded-lg">
+                    </div>
+                    <div>
+                        <label class="modal-label block text-sm mb-2">상태</label>
+                        <select id="editStatus" name="status" class="modal-input w-full px-4 py-2 rounded-lg">
+                            <option value="pending">대기 중</option>
+                            <option value="in_progress">진행 중</option>
+                            <option value="completed">완료</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="modal-label block text-sm mb-2">프롬프트</label>
+                    <textarea id="editPrompt" name="prompt" class="modal-textarea w-full px-4 py-2 rounded-lg" rows="6"></textarea>
+                    <button type="button" onclick="regeneratePrompt()" class="mt-2 text-sm text-blue-600 hover:text-blue-700">
+                        <i class="fas fa-sync-alt mr-1"></i>
+                        프롬프트 재생성
+                    </button>
+                </div>
+                
+                <div>
+                    <label class="modal-label block text-sm mb-2">메모</label>
+                    <textarea id="editNotes" name="notes" placeholder="작업 관련 메모나 추가 정보를 입력하세요" class="modal-textarea w-full px-4 py-2 rounded-lg" rows="3"></textarea>
+                </div>
+                
+                <div class="flex gap-3 mt-6 pt-4 border-t">
+                    <button type="button" onclick="closeTaskDetailModal()" class="flex-1 px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 font-medium transition">
+                        취소
+                    </button>
+                    <button type="submit" class="flex-1 btn-primary px-4 py-2 rounded-lg text-white font-medium">
+                        <i class="fas fa-save mr-2"></i>
+                        저장
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
     <script>
         let allTasks = [];
         let allClients = [];
         let currentFilter = 'all';
+        let currentEditingTask = null;
         
         // 초기 로드
         async function loadData() {
@@ -1019,11 +1092,104 @@ app.get('/tasks', (c) => {
         
         // 작업 상세 보기
         function viewTask(id) {
-            const task = allTasks.find(t => t.id === id);
-            if (task) {
-                alert(\`작업 상세 정보:\\n\\n제목: \${task.title}\\n고객: \${task.client_name}\\n설명: \${task.description}\\n프롬프트: \${task.prompt || '없음'}\`);
+            const task = allTasks.find(t => t.id == id);
+            if (!task) return;
+            
+            currentEditingTask = task;
+            
+            // 폼 필드 채우기
+            document.getElementById('editTaskId').value = task.id;
+            document.getElementById('editTitle').value = task.title || '';
+            document.getElementById('editDescription').value = task.description || '';
+            document.getElementById('editClientName').value = task.client_name || '';
+            document.getElementById('editPackage').value = task.package_id + ' 패키지';
+            document.getElementById('editDueDate').value = task.due_date || '';
+            document.getElementById('editStatus').value = task.status || 'pending';
+            document.getElementById('editPrompt').value = task.prompt || '';
+            document.getElementById('editNotes').value = task.notes || '';
+            
+            // 모달 열기
+            document.getElementById('taskDetailModal').classList.remove('hidden');
+        }
+        
+        // 작업 상세 모달 닫기
+        function closeTaskDetailModal() {
+            document.getElementById('taskDetailModal').classList.add('hidden');
+            currentEditingTask = null;
+        }
+        
+        // 프롬프트 재생성
+        async function regeneratePrompt() {
+            if (!currentEditingTask) return;
+            
+            const title = document.getElementById('editTitle').value;
+            const description = document.getElementById('editDescription').value;
+            
+            if (!title || !description) {
+                alert('제목과 설명을 먼저 입력해주세요.');
+                return;
+            }
+            
+            const promptField = document.getElementById('editPrompt');
+            const originalText = promptField.value;
+            promptField.value = '프롬프트 생성 중...';
+            promptField.disabled = true;
+            
+            try {
+                const response = await axios.post('/api/generate-prompt', {
+                    title: title,
+                    description: description
+                });
+                
+                if (response.data.success) {
+                    promptField.value = response.data.prompt;
+                } else {
+                    alert('프롬프트 생성에 실패했습니다.');
+                    promptField.value = originalText;
+                }
+            } catch (error) {
+                alert('프롬프트 생성 중 오류가 발생했습니다.');
+                promptField.value = originalText;
+            } finally {
+                promptField.disabled = false;
             }
         }
+        
+        // 작업 편집 폼 제출
+        document.getElementById('editTaskForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const taskId = document.getElementById('editTaskId').value;
+            const formData = new FormData(e.target);
+            
+            const updateData = {
+                title: formData.get('title'),
+                description: formData.get('description'),
+                due_date: formData.get('due_date') || null,
+                status: formData.get('status'),
+                prompt: formData.get('prompt') || null,
+                notes: formData.get('notes') || null
+            };
+            
+            // 완료 상태로 변경 시 완료일 설정
+            if (updateData.status === 'completed' && currentEditingTask.status !== 'completed') {
+                updateData.completed_at = new Date().toISOString().split('T')[0];
+            }
+            
+            try {
+                const response = await axios.put('/api/tasks/' + taskId, updateData);
+                
+                if (response.data.success) {
+                    closeTaskDetailModal();
+                    loadData();
+                } else {
+                    alert('작업 수정에 실패했습니다.');
+                }
+            } catch (error) {
+                console.error('작업 수정 실패:', error);
+                alert('작업 수정 중 오류가 발생했습니다.');
+            }
+        });
         
         // 고객 선택 목록 채우기
         function populateClientSelect() {
