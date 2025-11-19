@@ -933,6 +933,12 @@ app.get('/tasks', (c) => {
                             <i class="fas fa-eye mr-1"></i>
                             상세
                         </button>
+                        \${task.prompt ? \`
+                        <button onclick="sendToMP4Generator('\${task.id}')" class="flex-1 px-3 py-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 text-sm transition">
+                            <i class="fas fa-video mr-1"></i>
+                            영상 생성
+                        </button>
+                        \` : ''}
                         <button onclick="changeStatus('\${task.id}', '\${getNextStatus(task.status)}')" class="flex-1 px-3 py-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 text-sm transition">
                             <i class="fas fa-arrow-right mr-1"></i>
                             \${getNextStatusText(task.status)}
@@ -1114,6 +1120,26 @@ app.get('/tasks', (c) => {
                 alert('작업 추가 실패');
             }
         });
+        
+        // MP4 Generator로 프롬프트 전송
+        function sendToMP4Generator(taskId) {
+            const task = allTasks.find(t => t.id == taskId);
+            if (!task || !task.prompt) {
+                alert('프롬프트가 없습니다.');
+                return;
+            }
+            
+            // MP4 Generator URL에 프롬프트를 쿼리 파라미터로 전달
+            const mp4Url = 'https://studiojuai-mp4.pages.dev/';
+            const params = new URLSearchParams({
+                prompt: task.prompt,
+                title: task.title,
+                client: task.client_name
+            });
+            
+            // 새 탭에서 MP4 Generator 열기
+            window.open(\`\${mp4Url}?\${params.toString()}\`, '_blank');
+        }
         
         // 로그아웃
         function logout() {
