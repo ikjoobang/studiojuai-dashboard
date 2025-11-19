@@ -1622,7 +1622,7 @@ app.get('/dashboard', (c) => {
                 </div>
             </div>
             
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 <!-- 작업 상태 분포 -->
                 <div class="glass-card rounded-xl p-6">
                     <h3 class="text-xl font-semibold text-white mb-4">작업 상태 분포</h3>
@@ -1633,6 +1633,31 @@ app.get('/dashboard', (c) => {
                 <div class="glass-card rounded-xl p-6">
                     <h3 class="text-xl font-semibold text-white mb-4">패키지별 통계</h3>
                     <canvas id="packageChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- 최근 작업 및 고객 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- 최근 작업 -->
+                <div class="glass-card rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-semibold text-white">최근 작업</h3>
+                        <a href="/tasks" class="text-sm text-blue-400 hover:text-blue-300">전체 보기 →</a>
+                    </div>
+                    <div id="recentTasks" class="space-y-3">
+                        <!-- JavaScript로 동적 생성 -->
+                    </div>
+                </div>
+                
+                <!-- 최근 고객 -->
+                <div class="glass-card rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-xl font-semibold text-white">최근 고객</h3>
+                        <a href="/clients" class="text-sm text-blue-400 hover:text-blue-300">전체 보기 →</a>
+                    </div>
+                    <div id="recentClients" class="space-y-3">
+                        <!-- JavaScript로 동적 생성 -->
+                    </div>
                 </div>
             </div>
         </main>
@@ -1656,6 +1681,8 @@ app.get('/dashboard', (c) => {
                 
                 updateStats();
                 renderCharts();
+                renderRecentTasks();
+                renderRecentClients();
             } catch (error) {
                 console.error('데이터 로드 실패:', error);
             }
@@ -1849,6 +1876,79 @@ app.get('/dashboard', (c) => {
                     }
                 }
             });
+        }
+        
+        // 최근 작업 렌더링
+        function renderRecentTasks() {
+            const container = document.getElementById('recentTasks');
+            const recentTasks = tasks.slice(0, 5);
+            
+            if (recentTasks.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-400 py-4">작업이 없습니다</p>';
+                return;
+            }
+            
+            container.innerHTML = recentTasks.map(task => 
+                '<div class="bg-white/5 rounded-lg p-4 border border-white/10 hover:bg-white/10 transition cursor-pointer" onclick="location.href=\'/tasks\'">' +
+                    '<div class="flex items-start justify-between mb-2">' +
+                        '<div class="flex-1">' +
+                            '<h4 class="text-white font-medium text-sm">' + task.title + '</h4>' +
+                            '<p class="text-xs text-gray-400 mt-1">' + task.client_name + '</p>' +
+                        '</div>' +
+                        '<span class="status-badge status-' + task.status + ' text-xs ml-2">' +
+                            '<span class="status-dot"></span>' +
+                            getStatusText(task.status) +
+                        '</span>' +
+                    '</div>' +
+                    '<div class="flex items-center gap-3 text-xs text-gray-400 mt-2">' +
+                        '<span><i class="fas fa-calendar mr-1"></i>' + task.created_at + '</span>' +
+                        '<span><i class="fas fa-box mr-1"></i>' + task.package_id + ' 패키지</span>' +
+                    '</div>' +
+                '</div>'
+            ).join('');
+        }
+        
+        // 최근 고객 렌더링
+        function renderRecentClients() {
+            const container = document.getElementById('recentClients');
+            const recentClients = clients.slice(0, 5);
+            
+            if (recentClients.length === 0) {
+                container.innerHTML = '<p class="text-center text-gray-400 py-4">고객이 없습니다</p>';
+                return;
+            }
+            
+            container.innerHTML = recentClients.map(client => 
+                '<div class="bg-white/5 rounded-lg p-4 border border-white/10 hover:bg-white/10 transition cursor-pointer" onclick="location.href=\'/clients\'">' +
+                    '<div class="flex items-start justify-between mb-2">' +
+                        '<div class="flex-1">' +
+                            '<h4 class="text-white font-medium text-sm">' + client.name + '</h4>' +
+                            '<p class="text-xs text-gray-400 mt-1">' + client.category + '</p>' +
+                        '</div>' +
+                        '<span class="status-badge status-' + client.status + ' text-xs ml-2">' +
+                            '<span class="status-dot"></span>' +
+                            (client.status === 'active' ? '활성' : '일시중지') +
+                        '</span>' +
+                    '</div>' +
+                    '<div class="flex items-center gap-3 text-xs text-gray-400 mt-2">' +
+                        '<span><i class="fas fa-' + (client.type === 'brand' ? 'building' : 'user') + ' mr-1"></i>' +
+                            (client.type === 'brand' ? '업체' : '개인') +
+                        '</span>' +
+                        '<span><i class="fas fa-box mr-1"></i>' + client.package_id + ' 패키지</span>' +
+                        '<span><i class="fas fa-calendar mr-1"></i>' + client.created_at + '</span>' +
+                    '</div>' +
+                '</div>'
+            ).join('');
+        }
+        
+        // 상태 텍스트
+        function getStatusText(status) {
+            const map = {
+                'pending': '대기 중',
+                'in_progress': '진행 중',
+                'completed': '완료'
+            };
+            return map[status] || status;
         }
         
         // 로그아웃
