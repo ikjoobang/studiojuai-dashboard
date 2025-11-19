@@ -706,9 +706,13 @@ app.get('/tasks', (c) => {
                     <i class="fas fa-building w-5"></i>
                     <span>업체 관리</span>
                 </a>
-                <a href="/individuals" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 mb-2">
-                    <i class="fas fa-user w-5"></i>
-                    <span>개인 관리</span>
+                <a href="/dashboard" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 mb-2">
+                    <i class="fas fa-home w-5"></i>
+                    <span>대시보드</span>
+                </a>
+                <a href="/clients" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 mb-2">
+                    <i class="fas fa-users w-5"></i>
+                    <span>고객 관리</span>
                 </a>
                 <a href="/tasks" class="sidebar-item active flex items-center gap-3 px-4 py-3 rounded-lg text-white mb-2">
                     <i class="fas fa-tasks w-5"></i>
@@ -1998,17 +2002,13 @@ app.get('/clients', (c) => {
             </div>
             
             <nav class="p-4 space-y-2">
-                <a href="/" class="sidebar-item active flex items-center gap-3 px-4 py-3 rounded-lg text-white">
+                <a href="/dashboard" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:text-white">
                     <i class="fas fa-home w-5"></i>
                     <span>대시보드</span>
                 </a>
-                <a href="/brands" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:text-white">
-                    <i class="fas fa-building w-5"></i>
-                    <span>업체 관리</span>
-                </a>
-                <a href="/individuals" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:text-white">
+                <a href="/clients" class="sidebar-item active flex items-center gap-3 px-4 py-3 rounded-lg text-white">
                     <i class="fas fa-users w-5"></i>
-                    <span>개인 관리</span>
+                    <span>고객 관리</span>
                 </a>
                 <a href="/tasks" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:text-white">
                     <i class="fas fa-tasks w-5"></i>
