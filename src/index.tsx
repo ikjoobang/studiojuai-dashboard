@@ -775,7 +775,67 @@ app.get('/tasks', (c) => {
                 </div>
             </div>
             
-            <!-- 필터 및 추가 버튼 -->
+            <!-- 검색 및 필터 -->
+            <div class="glass-card rounded-xl p-6 mb-6">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                    <div class="md:col-span-2">
+                        <label class="text-sm text-gray-400 mb-2 block">고객 검색</label>
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <input 
+                                type="text" 
+                                id="searchInput" 
+                                placeholder="고객명 또는 작업 제목으로 검색..." 
+                                class="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                                onkeyup="applyFilters()"
+                            >
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="text-sm text-gray-400 mb-2 block">시작일</label>
+                        <input 
+                            type="date" 
+                            id="startDate" 
+                            class="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                            onchange="applyFilters()"
+                        >
+                    </div>
+                    
+                    <div>
+                        <label class="text-sm text-gray-400 mb-2 block">종료일</label>
+                        <input 
+                            type="date" 
+                            id="endDate" 
+                            class="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                            onchange="applyFilters()"
+                        >
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-3">
+                    <label class="text-sm text-gray-400">패키지:</label>
+                    <button onclick="filterByPackage('all')" class="package-filter-btn active px-3 py-1 rounded text-sm bg-blue-500 text-white">
+                        전체
+                    </button>
+                    <button onclick="filterByPackage('A')" class="package-filter-btn px-3 py-1 rounded text-sm bg-white/5 text-gray-400 hover:bg-white/10">
+                        A 패키지
+                    </button>
+                    <button onclick="filterByPackage('B')" class="package-filter-btn px-3 py-1 rounded text-sm bg-white/5 text-gray-400 hover:bg-white/10">
+                        B 패키지
+                    </button>
+                    <button onclick="filterByPackage('C')" class="package-filter-btn px-3 py-1 rounded text-sm bg-white/5 text-gray-400 hover:bg-white/10">
+                        C 패키지
+                    </button>
+                    
+                    <button onclick="clearFilters()" class="ml-auto px-4 py-1 rounded text-sm text-gray-400 hover:text-white">
+                        <i class="fas fa-redo mr-1"></i>
+                        초기화
+                    </button>
+                </div>
+            </div>
+            
+            <!-- 상태 필터 및 추가 버튼 -->
             <div class="flex flex-wrap gap-4 mb-6">
                 <button onclick="filterTasks('all')" class="filter-btn active px-4 py-2 rounded-lg bg-blue-500 text-white">
                     전체
@@ -933,6 +993,10 @@ app.get('/tasks', (c) => {
         let allClients = [];
         let currentFilter = 'all';
         let currentEditingTask = null;
+        let currentPackageFilter = 'all';
+        let searchQuery = '';
+        let startDateFilter = '';
+        let endDateFilter = '';
         
         // 초기 로드
         async function loadData() {
@@ -966,8 +1030,33 @@ app.get('/tasks', (c) => {
             const container = document.getElementById('tasksList');
             
             let filtered = allTasks;
+            
+            // 상태 필터
             if (currentFilter !== 'all') {
-                filtered = allTasks.filter(t => t.status === currentFilter);
+                filtered = filtered.filter(t => t.status === currentFilter);
+            }
+            
+            // 패키지 필터
+            if (currentPackageFilter !== 'all') {
+                filtered = filtered.filter(t => t.package_id === currentPackageFilter);
+            }
+            
+            // 검색어 필터
+            if (searchQuery) {
+                const query = searchQuery.toLowerCase();
+                filtered = filtered.filter(t => 
+                    t.title.toLowerCase().includes(query) || 
+                    t.client_name.toLowerCase().includes(query) ||
+                    (t.description && t.description.toLowerCase().includes(query))
+                );
+            }
+            
+            // 날짜 범위 필터
+            if (startDateFilter) {
+                filtered = filtered.filter(t => t.created_at >= startDateFilter);
+            }
+            if (endDateFilter) {
+                filtered = filtered.filter(t => t.created_at <= endDateFilter);
             }
             
             if (filtered.length === 0) {
@@ -1086,6 +1175,62 @@ app.get('/tasks', (c) => {
             
             event.target.classList.add('active', 'bg-blue-500', 'text-white');
             event.target.classList.remove('bg-white/5', 'text-gray-400');
+            
+            renderTasks();
+        }
+        
+        // 패키지 필터
+        function filterByPackage(packageId) {
+            currentPackageFilter = packageId;
+            
+            document.querySelectorAll('.package-filter-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-blue-500', 'text-white');
+                btn.classList.add('bg-white/5', 'text-gray-400');
+            });
+            
+            event.target.classList.add('active', 'bg-blue-500', 'text-white');
+            event.target.classList.remove('bg-white/5', 'text-gray-400');
+            
+            renderTasks();
+        }
+        
+        // 통합 필터 적용
+        function applyFilters() {
+            searchQuery = document.getElementById('searchInput').value;
+            startDateFilter = document.getElementById('startDate').value;
+            endDateFilter = document.getElementById('endDate').value;
+            renderTasks();
+        }
+        
+        // 필터 초기화
+        function clearFilters() {
+            // 검색어 초기화
+            document.getElementById('searchInput').value = '';
+            searchQuery = '';
+            
+            // 날짜 필터 초기화
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            startDateFilter = '';
+            endDateFilter = '';
+            
+            // 패키지 필터 초기화
+            currentPackageFilter = 'all';
+            document.querySelectorAll('.package-filter-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-blue-500', 'text-white');
+                btn.classList.add('bg-white/5', 'text-gray-400');
+            });
+            document.querySelectorAll('.package-filter-btn')[0].classList.add('active', 'bg-blue-500', 'text-white');
+            document.querySelectorAll('.package-filter-btn')[0].classList.remove('bg-white/5', 'text-gray-400');
+            
+            // 상태 필터 초기화
+            currentFilter = 'all';
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active', 'bg-blue-500', 'text-white');
+                btn.classList.add('bg-white/5', 'text-gray-400');
+            });
+            document.querySelectorAll('.filter-btn')[0].classList.add('active', 'bg-blue-500', 'text-white');
+            document.querySelectorAll('.filter-btn')[0].classList.remove('bg-white/5', 'text-gray-400');
             
             renderTasks();
         }
