@@ -1435,6 +1435,21 @@ app.get('/', (c) => {
         </div>
     </div>
     
+    <!-- 고객 상세 모달 -->
+    <div id="clientDetailModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="modal-content rounded-2xl p-8 max-w-4xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-2xl font-bold text-gray-900">고객 상세 정보</h3>
+                <button onclick="closeClientDetailModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div id="clientDetailContent">
+                <!-- JavaScript로 동적 생성 -->
+            </div>
+        </div>
+    </div>
+    
     <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
     <script>
         let allClients = [];
@@ -1515,8 +1530,186 @@ app.get('/', (c) => {
         }
         
         // 고객 상세 보기
-        function viewClient(id) {
-            alert('고객 상세 페이지 (개발 예정): ' + id);
+        async function viewClient(id) {
+            try {
+                // 고객 정보 가져오기
+                const client = allClients.find(c => c.id === id);
+                if (!client) return;
+                
+                // 해당 고객의 작업 목록 가져오기
+                const tasksResponse = await axios.get('/api/tasks?client_id=' + id);
+                const clientTasks = tasksResponse.data.data;
+                
+                // 통계 계산
+                const totalTasks = clientTasks.length;
+                const completedTasks = clientTasks.filter(t => t.status === 'completed').length;
+                const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+                const inProgressTasks = clientTasks.filter(t => t.status === 'in_progress').length;
+                const pendingTasks = clientTasks.filter(t => t.status === 'pending').length;
+                
+                // 채널 정보 파싱
+                let channelsHTML = '';
+                try {
+                    const channels = JSON.parse(client.channels || '{}');
+                    channelsHTML = Object.entries(channels)
+                        .map(([key, value]) => 
+                            '<div class="flex items-center gap-2 text-sm">' +
+                                '<i class="fas fa-' + getChannelIcon(key) + ' w-4 text-gray-400"></i>' +
+                                '<span class="text-gray-300">' + formatChannelName(key) + ': ' + value + '</span>' +
+                            '</div>'
+                        ).join('');
+                } catch (e) {
+                    channelsHTML = '<p class="text-sm text-gray-400">채널 정보 없음</p>';
+                }
+                
+                // 작업 히스토리 HTML
+                const tasksHTML = clientTasks.length > 0 
+                    ? clientTasks.map(task => 
+                        '<div class="bg-white/5 rounded-lg p-4 border border-white/10">' +
+                            '<div class="flex items-start justify-between mb-2">' +
+                                '<div class="flex-1">' +
+                                    '<h4 class="text-white font-medium">' + task.title + '</h4>' +
+                                    '<p class="text-sm text-gray-400 mt-1">' + task.description + '</p>' +
+                                '</div>' +
+                                '<span class="status-badge status-' + task.status + ' ml-2">' +
+                                    '<span class="status-dot"></span>' +
+                                    getStatusText(task.status) +
+                                '</span>' +
+                            '</div>' +
+                            '<div class="flex items-center gap-4 text-xs text-gray-400 mt-3">' +
+                                '<span><i class="fas fa-calendar mr-1"></i>' + task.created_at + '</span>' +
+                                (task.due_date ? '<span><i class="fas fa-clock mr-1"></i>마감: ' + task.due_date + '</span>' : '') +
+                                (task.completed_at ? '<span><i class="fas fa-check mr-1"></i>완료: ' + task.completed_at + '</span>' : '') +
+                            '</div>' +
+                        '</div>'
+                    ).join('')
+                    : '<p class="text-center text-gray-400 py-8">작업 이력이 없습니다</p>';
+                
+                // 모달 내용 채우기
+                document.getElementById('clientDetailContent').innerHTML = 
+                    '<div class="space-y-6">' +
+                        '<!-- 기본 정보 -->' +
+                        '<div>' +
+                            '<h4 class="text-lg font-semibold text-white mb-4">기본 정보</h4>' +
+                            '<div class="grid grid-cols-2 gap-4">' +
+                                '<div>' +
+                                    '<p class="text-sm text-gray-400 mb-1">고객명</p>' +
+                                    '<p class="text-white font-medium">' + client.name + '</p>' +
+                                '</div>' +
+                                '<div>' +
+                                    '<p class="text-sm text-gray-400 mb-1">유형</p>' +
+                                    '<p class="text-white font-medium">' +
+                                        '<i class="fas fa-' + (client.type === 'brand' ? 'building' : 'user') + ' mr-1"></i>' +
+                                        (client.type === 'brand' ? '업체' : '개인') +
+                                    '</p>' +
+                                '</div>' +
+                                '<div>' +
+                                    '<p class="text-sm text-gray-400 mb-1">카테고리</p>' +
+                                    '<p class="text-white font-medium">' + client.category + '</p>' +
+                                '</div>' +
+                                '<div>' +
+                                    '<p class="text-sm text-gray-400 mb-1">패키지</p>' +
+                                    '<p class="text-white font-medium">' + client.package_id + ' 패키지</p>' +
+                                '</div>' +
+                                '<div>' +
+                                    '<p class="text-sm text-gray-400 mb-1">상태</p>' +
+                                    '<span class="status-badge status-' + client.status + '">' +
+                                        '<span class="status-dot"></span>' +
+                                        (client.status === 'active' ? '활성' : '일시중지') +
+                                    '</span>' +
+                                '</div>' +
+                                '<div>' +
+                                    '<p class="text-sm text-gray-400 mb-1">등록일</p>' +
+                                    '<p class="text-white font-medium">' + client.created_at + '</p>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        
+                        '<!-- 채널 정보 -->' +
+                        '<div>' +
+                            '<h4 class="text-lg font-semibold text-white mb-4">채널 정보</h4>' +
+                            '<div class="space-y-2">' +
+                                channelsHTML +
+                            '</div>' +
+                        '</div>' +
+                        
+                        '<!-- 통계 -->' +
+                        '<div>' +
+                            '<h4 class="text-lg font-semibold text-white mb-4">작업 통계</h4>' +
+                            '<div class="grid grid-cols-4 gap-4">' +
+                                '<div class="bg-blue-500/10 rounded-lg p-4 border border-blue-500/20">' +
+                                    '<p class="text-sm text-blue-400 mb-1">전체 작업</p>' +
+                                    '<p class="text-2xl font-bold text-white">' + totalTasks + '</p>' +
+                                '</div>' +
+                                '<div class="bg-yellow-500/10 rounded-lg p-4 border border-yellow-500/20">' +
+                                    '<p class="text-sm text-yellow-400 mb-1">대기 중</p>' +
+                                    '<p class="text-2xl font-bold text-white">' + pendingTasks + '</p>' +
+                                '</div>' +
+                                '<div class="bg-purple-500/10 rounded-lg p-4 border border-purple-500/20">' +
+                                    '<p class="text-sm text-purple-400 mb-1">진행 중</p>' +
+                                    '<p class="text-2xl font-bold text-white">' + inProgressTasks + '</p>' +
+                                '</div>' +
+                                '<div class="bg-green-500/10 rounded-lg p-4 border border-green-500/20">' +
+                                    '<p class="text-sm text-green-400 mb-1">완료율</p>' +
+                                    '<p class="text-2xl font-bold text-white">' + completionRate + '%</p>' +
+                                '</div>' +
+                            '</div>' +
+                        '</div>' +
+                        
+                        '<!-- 작업 히스토리 -->' +
+                        '<div>' +
+                            '<h4 class="text-lg font-semibold text-white mb-4">작업 히스토리</h4>' +
+                            '<div class="space-y-3 max-h-96 overflow-y-auto">' +
+                                tasksHTML +
+                            '</div>' +
+                        '</div>' +
+                    '</div>';
+                
+                // 모달 열기
+                document.getElementById('clientDetailModal').classList.remove('hidden');
+            } catch (error) {
+                console.error('고객 상세 정보 로드 실패:', error);
+                alert('고객 상세 정보를 불러올 수 없습니다.');
+            }
+        }
+        
+        // 채널 아이콘 매핑
+        function getChannelIcon(channel) {
+            const icons = {
+                'instagram': 'instagram',
+                'youtube': 'youtube',
+                'tiktok': 'video',
+                'naver_blog': 'blog',
+                'facebook': 'facebook'
+            };
+            return icons[channel] || 'link';
+        }
+        
+        // 채널 이름 포맷팅
+        function formatChannelName(channel) {
+            const names = {
+                'instagram': 'Instagram',
+                'youtube': 'YouTube',
+                'tiktok': 'TikTok',
+                'naver_blog': 'Naver Blog',
+                'facebook': 'Facebook'
+            };
+            return names[channel] || channel;
+        }
+        
+        // 상태 텍스트
+        function getStatusText(status) {
+            const map = {
+                'pending': '대기 중',
+                'in_progress': '진행 중',
+                'completed': '완료'
+            };
+            return map[status] || status;
+        }
+        
+        // 고객 상세 모달 닫기
+        function closeClientDetailModal() {
+            document.getElementById('clientDetailModal').classList.add('hidden');
         }
         
         // 모달 열기/닫기
