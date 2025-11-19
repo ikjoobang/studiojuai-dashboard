@@ -5,10 +5,13 @@ StudioJuAI Dashboard는 마케팅 영상 제작 작업을 관리하는 통합 �
 
 ## 주요 기능
 
-### ✅ 1. MP4 Generator 연결
-- 프롬프트가 있는 작업에 "영상 생성" 버튼 표시
-- URL 파라미터로 작업 데이터 전송
-- 새 탭에서 MP4 Generator (https://studiojuai-mp4.pages.dev/) 열기
+### ✅ 1. MP4 Generator 완전 통합
+- **자동 영상 생성**: 작업 상세 모달에서 직접 영상 생성 요청
+- **AI 모델 선택**: Sora 2, Sora 2 Pro, Veo 3.1, Veo 3.1 Fast, Kling v2.5 Turbo/Pro
+- **실시간 상태 추적**: 30초마다 자동 폴링으로 생성 상태 확인
+- **프롬프트 자동 생성**: OpenAI GPT-4o-mini로 영상 프롬프트 최적화
+- **다운로드 지원**: 완성된 영상 자동 다운로드 링크 제공
+- **데이터베이스 연동**: video_task_id, video_status, video_url 자동 저장
 
 ### ✅ 2. 고객 상세 페이지
 - **기본 정보**: 이름, 유형, 카테고리, 패키지, 상태, 등록일
@@ -49,7 +52,9 @@ StudioJuAI Dashboard는 마케팅 영상 제작 작업을 관리하는 통합 �
 - **Framework**: Hono (Cloudflare Workers)
 - **Runtime**: Cloudflare Workers
 - **Database**: Cloudflare D1 (SQLite)
-- **AI API**: OpenAI GPT-4o-mini (프롬프트 생성)
+- **AI API**: 
+  - OpenAI GPT-4o-mini (프롬프트 자동 생성)
+  - MP4 Generator API (영상 생성 - Sora 2, Veo 3.1, Kling v2.5)
 
 ### Development
 - **Build Tool**: Vite 5.0.0
@@ -88,6 +93,9 @@ CREATE TABLE tasks (
   status TEXT NOT NULL DEFAULT 'pending',
   package_id TEXT NOT NULL,
   notes TEXT,
+  video_task_id TEXT,              -- MP4 Generator task ID
+  video_status TEXT DEFAULT 'pending',  -- pending/processing/completed/failed
+  video_url TEXT,                  -- 완성된 영상 URL
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   due_date DATE,
   completed_at DATETIME,
@@ -114,8 +122,10 @@ CREATE TABLE tasks (
 - `PUT /api/tasks/:id` - 작업 수정
 - `DELETE /api/tasks/:id` - 작업 삭제
 
-### AI
-- `POST /api/generate-prompt` - AI 프롬프트 생성
+### AI & Video Generation
+- `POST /api/prompt/generate` - AI 프롬프트 자동 생성 (OpenAI GPT-4o-mini)
+- `POST /api/video/generate` - 영상 생성 요청 (MP4 Generator)
+- `GET /api/video/status/:videoTaskId` - 영상 생성 상태 확인
 
 ## 로컬 개발 환경 설정
 
@@ -128,6 +138,8 @@ npm install
 `.dev.vars` 파일 생성:
 ```
 OPENAI_API_KEY=your-openai-api-key
+MP4_API_KEY=your-mp4-generator-api-key
+MP4_API_BASE=https://studiojuai-mp4.pages.dev/api/external
 ```
 
 ### 3. 데이터베이스 마이그레이션
@@ -169,6 +181,8 @@ npm run deploy
 ### 환경 변수 설정
 Cloudflare Pages 대시보드에서 설정:
 - `OPENAI_API_KEY`: OpenAI API 키
+- `MP4_API_KEY`: MP4 Generator API 키
+- `MP4_API_BASE`: MP4 Generator API 엔드포인트
 - D1 Database: `studiojuai-production` 바인딩
 
 ## 디렉토리 구조
@@ -179,7 +193,8 @@ studiojuai-dashboard/
 ├── migrations/
 │   ├── 0001_initial_schema.sql
 │   ├── 0002_seed_data.sql
-│   └── 0003_add_notes_column.sql
+│   ├── 0003_add_notes_column.sql
+│   └── 0004_add_video_fields.sql
 ├── public/                    # 정적 파일
 ├── dist/                      # 빌드 출력
 ├── ecosystem.config.cjs       # PM2 설정
@@ -193,15 +208,22 @@ studiojuai-dashboard/
 - API 응답 시간: 5-17ms
 - 데이터베이스 쿼리: 0-1ms
 - 페이지 로드: <100ms
+- 프롬프트 생성: ~5.7초 (OpenAI GPT-4o-mini)
+- 영상 생성 요청: ~1.7초 (MP4 Generator)
+- 영상 생성 완료: 2-5분 (AI 모델에 따라 다름)
 
 ## 테스트 상태
 ✅ 프론트엔드: 3/3 페이지 정상
-✅ 백엔드 API: 5/5 엔드포인트 정상
+✅ 백엔드 API: 8/8 엔드포인트 정상 (Clients 5개 + Tasks 3개)
 ✅ 데이터베이스: 연결 및 쿼리 정상
 ✅ 미들웨어: CORS, Logging 정상
 ✅ 기능 구현: 5/5 완료
+✅ MP4 Generator 통합: OpenAI + 영상 생성 API 정상
+✅ 외부 API: OpenAI API, MP4 Generator API 연결 확인
 
 **전체 테스트 통과율: 100%**
+
+상세 테스트 리포트: [MP4_INTEGRATION_TEST.md](./MP4_INTEGRATION_TEST.md)
 
 ## 라이선스
 Private

@@ -6,6 +6,8 @@ import { serveStatic } from 'hono/cloudflare-workers'
 type Env = {
   DB: D1Database;
   OPENAI_API_KEY: string;
+  MP4_API_KEY: string;
+  MP4_API_BASE: string;
 }
 
 const app = new Hono<{ Bindings: Env }>()
@@ -510,6 +512,197 @@ app.delete('/api/tasks/:id', async (c) => {
   }
 });
 
+// ===== MP4 Generator API =====
+
+// 영상 생성 요청
+app.post('/api/video/generate', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { taskId, model, prompt, autoPrompt, aspectRatio, duration, audioUrl, referenceImage } = body;
+    
+    if (!taskId || !model || !prompt) {
+      return c.json({
+        success: false,
+        message: 'taskId, model, prompt는 필수 항목입니다.'
+      }, 400);
+    }
+
+    // MP4 Generator API 호출
+    const response = await fetch(`${c.env.MP4_API_BASE}/video/generate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${c.env.MP4_API_KEY}`
+      },
+      body: JSON.stringify({
+        model,
+        prompt,
+        autoPrompt: autoPrompt || false,
+        aspectRatio: aspectRatio || '16:9',
+        duration: duration || '5',
+        audioUrl: audioUrl || '',
+        referenceImage: referenceImage || ''
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return c.json({
+        success: false,
+        message: 'MP4 Generator API 호출 실패',
+        error: errorText
+      }, response.status);
+    }
+
+    const data = await response.json();
+    
+    // 작업에 video_task_id 저장
+    await c.env.DB.prepare(
+      'UPDATE tasks SET video_task_id = ?, video_status = ? WHERE id = ?'
+    ).bind(data.taskId, 'processing', taskId).run();
+    
+    return c.json({
+      success: true,
+      data: {
+        taskId: data.taskId,
+        status: data.status,
+        provider: data.provider,
+        model: data.model,
+        estimatedTime: data.estimatedTime
+      }
+    });
+  } catch (error) {
+    console.error('Video generation error:', error);
+    return c.json({
+      success: false,
+      message: '영상 생성 요청에 실패했습니다.',
+      error: String(error)
+    }, 500);
+  }
+});
+
+// 영상 생성 상태 확인
+app.get('/api/video/status/:videoTaskId', async (c) => {
+  try {
+    const videoTaskId = c.req.param('videoTaskId');
+    
+    // MP4 Generator API 상태 확인
+    const response = await fetch(`${c.env.MP4_API_BASE}/video/status/${videoTaskId}`, {
+      headers: {
+        'Authorization': `Bearer ${c.env.MP4_API_KEY}`
+      }
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return c.json({
+        success: false,
+        message: 'MP4 Generator API 호출 실패',
+        error: errorText
+      }, response.status);
+    }
+
+    const data = await response.json();
+    
+    // 데이터베이스 업데이트
+    if (data.status === 'completed' && data.videoUrl) {
+      await c.env.DB.prepare(
+        'UPDATE tasks SET video_status = ?, video_url = ?, completed_at = ? WHERE video_task_id = ?'
+      ).bind('completed', data.videoUrl, new Date().toISOString().split('T')[0], videoTaskId).run();
+    } else if (data.status === 'failed') {
+      await c.env.DB.prepare(
+        'UPDATE tasks SET video_status = ? WHERE video_task_id = ?'
+      ).bind('failed', videoTaskId).run();
+    }
+    
+    return c.json({
+      success: true,
+      data: {
+        taskId: data.taskId,
+        status: data.status,
+        videoUrl: data.videoUrl || null,
+        duration: data.duration,
+        provider: data.provider,
+        model: data.model,
+        error: data.error || null,
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
+        completedAt: data.completedAt || null
+      }
+    });
+  } catch (error) {
+    console.error('Video status check error:', error);
+    return c.json({
+      success: false,
+      message: '영상 상태 확인에 실패했습니다.',
+      error: String(error)
+    }, 500);
+  }
+});
+
+// 프롬프트 자동 생성 (OpenAI GPT)
+app.post('/api/prompt/generate', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { title, description } = body;
+    
+    if (!title) {
+      return c.json({
+        success: false,
+        message: 'title은 필수 항목입니다.'
+      }, 400);
+    }
+
+    // OpenAI API 호출
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${c.env.OPENAI_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: '당신은 숏폼 영상 제작 전문가입니다. 주어진 제목과 설명을 바탕으로 AI 영상 생성에 최적화된 영문 프롬프트를 작성해주세요. 프롬프트는 구체적이고, 시각적이며, 영상의 구도, 색감, 움직임을 포함해야 합니다.'
+          },
+          {
+            role: 'user',
+            content: `제목: ${title}\n설명: ${description || '없음'}\n\n위 내용을 바탕으로 30초 이내의 숏폼 영상을 만들기 위한 영문 프롬프트를 작성해주세요.`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 500
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return c.json({
+        success: false,
+        message: 'OpenAI API 호출 실패',
+        error: errorText
+      }, response.status);
+    }
+
+    const data = await response.json();
+    const generatedPrompt = data.choices[0].message.content;
+    
+    return c.json({
+      success: true,
+      prompt: generatedPrompt
+    });
+  } catch (error) {
+    console.error('Prompt generation error:', error);
+    return c.json({
+      success: false,
+      message: '프롬프트 생성에 실패했습니다.',
+      error: String(error)
+    }, 500);
+  }
+});
+
 // ===== 페이지 라우트 =====
 
 // 대시보드 (루트)
@@ -983,6 +1176,82 @@ app.get('/tasks', (c) => {
                     <textarea id="editNotes" name="notes" placeholder="작업 관련 메모나 추가 정보를 입력하세요" class="modal-textarea w-full px-4 py-2 rounded-lg" rows="3"></textarea>
                 </div>
                 
+                <!-- 영상 생성 섹션 -->
+                <div class="mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200">
+                    <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                        <i class="fas fa-video mr-2 text-purple-600"></i>
+                        MP4 영상 생성
+                    </h4>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="modal-label block text-sm mb-2">AI 모델</label>
+                            <select id="videoModel" class="modal-input w-full px-4 py-2 rounded-lg">
+                                <option value="sora-2">Sora 2 (빠름)</option>
+                                <option value="sora-2-pro">Sora 2 Pro (고품질)</option>
+                                <option value="veo-3.1">Veo 3.1</option>
+                                <option value="veo-3.1-fast">Veo 3.1 Fast</option>
+                                <option value="kling-v2.5-turbo">Kling v2.5 Turbo</option>
+                                <option value="kling-v2.5-pro">Kling v2.5 Pro</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="modal-label block text-sm mb-2">화면 비율</label>
+                            <select id="videoAspectRatio" class="modal-input w-full px-4 py-2 rounded-lg">
+                                <option value="16:9">16:9 (가로)</option>
+                                <option value="9:16">9:16 (세로)</option>
+                                <option value="1:1">1:1 (정사각형)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="modal-label block text-sm mb-2">영상 길이</label>
+                            <select id="videoDuration" class="modal-input w-full px-4 py-2 rounded-lg">
+                                <option value="5">5초</option>
+                                <option value="10">10초</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="modal-label block text-sm mb-2 flex items-center">
+                                <input type="checkbox" id="videoAutoPrompt" class="mr-2">
+                                GPT 프롬프트 최적화
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div id="videoStatusSection" class="hidden mb-4 p-3 bg-white rounded-lg">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <i class="fas fa-spinner fa-spin text-purple-600 mr-2"></i>
+                                <span id="videoStatusText" class="text-sm font-medium text-gray-700">영상 생성 중...</span>
+                            </div>
+                            <span id="videoProgress" class="text-xs text-gray-500"></span>
+                        </div>
+                    </div>
+                    
+                    <div id="videoResultSection" class="hidden mb-4">
+                        <div class="p-3 bg-green-50 border border-green-200 rounded-lg">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-green-700">
+                                    <i class="fas fa-check-circle mr-2"></i>
+                                    영상 생성 완료!
+                                </span>
+                                <a id="videoDownloadLink" href="#" target="_blank" class="text-sm text-blue-600 hover:text-blue-700">
+                                    <i class="fas fa-download mr-1"></i>
+                                    다운로드
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="button" id="generateVideoBtn" onclick="generateVideo()" class="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold hover:from-purple-700 hover:to-pink-700 transition shadow-lg">
+                        <i class="fas fa-magic mr-2"></i>
+                        영상 생성하기
+                    </button>
+                </div>
+                
                 <div class="flex gap-3 mt-6 pt-4 border-t">
                     <button type="button" onclick="closeTaskDetailModal()" class="flex-1 px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 font-medium transition">
                         취소
@@ -1097,6 +1366,13 @@ app.get('/tasks', (c) => {
                             <i class="fas fa-calendar w-4"></i>
                             <span>마감: \${task.due_date || '미정'}</span>
                         </div>
+                        \${task.video_status ? \`
+                        <div class="flex items-center gap-2 \${task.video_status === 'completed' ? 'text-green-400' : task.video_status === 'processing' ? 'text-yellow-400' : task.video_status === 'failed' ? 'text-red-400' : 'text-gray-400'}">
+                            <i class="fas fa-video w-4"></i>
+                            <span>영상: \${task.video_status === 'completed' ? '완료' : task.video_status === 'processing' ? '생성 중' : task.video_status === 'failed' ? '실패' : '대기'}</span>
+                            \${task.video_url ? \`<a href="\${task.video_url}" target="_blank" class="ml-2 text-blue-400 hover:text-blue-300"><i class="fas fa-download"></i></a>\` : ''}
+                        </div>
+                        \` : ''}
                     </div>
                     
                     <div class="flex gap-2 pt-4 border-t border-white/10">
@@ -1266,12 +1542,6 @@ app.get('/tasks', (c) => {
             document.getElementById('taskDetailModal').classList.remove('hidden');
         }
         
-        // 작업 상세 모달 닫기
-        function closeTaskDetailModal() {
-            document.getElementById('taskDetailModal').classList.add('hidden');
-            currentEditingTask = null;
-        }
-        
         // 프롬프트 재생성
         async function regeneratePrompt() {
             if (!currentEditingTask) return;
@@ -1290,7 +1560,7 @@ app.get('/tasks', (c) => {
             promptField.disabled = true;
             
             try {
-                const response = await axios.post('/api/generate-prompt', {
+                const response = await axios.post('/api/prompt/generate', {
                     title: title,
                     description: description
                 });
@@ -1307,6 +1577,120 @@ app.get('/tasks', (c) => {
             } finally {
                 promptField.disabled = false;
             }
+        }
+        
+        // 영상 생성
+        let pollingInterval = null;
+        
+        async function generateVideo() {
+            if (!currentEditingTask) return;
+            
+            const prompt = document.getElementById('editPrompt').value;
+            const model = document.getElementById('videoModel').value;
+            const aspectRatio = document.getElementById('videoAspectRatio').value;
+            const duration = document.getElementById('videoDuration').value;
+            const autoPrompt = document.getElementById('videoAutoPrompt').checked;
+            
+            if (!prompt) {
+                alert('프롬프트를 먼저 입력해주세요.');
+                return;
+            }
+            
+            // UI 상태 변경
+            document.getElementById('generateVideoBtn').disabled = true;
+            document.getElementById('videoStatusSection').classList.remove('hidden');
+            document.getElementById('videoResultSection').classList.add('hidden');
+            
+            try {
+                // 영상 생성 요청
+                const response = await axios.post('/api/video/generate', {
+                    taskId: currentEditingTask.id,
+                    model: model,
+                    prompt: prompt,
+                    autoPrompt: autoPrompt,
+                    aspectRatio: aspectRatio,
+                    duration: duration
+                });
+                
+                if (response.data.success) {
+                    const videoTaskId = response.data.data.taskId;
+                    document.getElementById('videoProgress').textContent = 
+                        '예상 소요시간: ' + response.data.data.estimatedTime;
+                    
+                    // 폴링 시작 (30초마다 상태 확인)
+                    startVideoPolling(videoTaskId);
+                } else {
+                    alert('영상 생성 요청에 실패했습니다: ' + response.data.message);
+                    resetVideoUI();
+                }
+            } catch (error) {
+                console.error('영상 생성 오류:', error);
+                alert('영상 생성 중 오류가 발생했습니다.');
+                resetVideoUI();
+            }
+        }
+        
+        function startVideoPolling(videoTaskId) {
+            // 기존 폴링 제거
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+            
+            // 즉시 한 번 확인
+            checkVideoStatus(videoTaskId);
+            
+            // 30초마다 확인
+            pollingInterval = setInterval(() => {
+                checkVideoStatus(videoTaskId);
+            }, 30000);
+        }
+        
+        async function checkVideoStatus(videoTaskId) {
+            try {
+                const response = await axios.get('/api/video/status/' + videoTaskId);
+                
+                if (response.data.success) {
+                    const data = response.data.data;
+                    
+                    if (data.status === 'completed') {
+                        // 완료
+                        clearInterval(pollingInterval);
+                        document.getElementById('videoStatusSection').classList.add('hidden');
+                        document.getElementById('videoResultSection').classList.remove('hidden');
+                        document.getElementById('videoDownloadLink').href = data.videoUrl;
+                        document.getElementById('generateVideoBtn').disabled = false;
+                        
+                        // 작업 목록 새로고침
+                        loadData();
+                    } else if (data.status === 'failed') {
+                        // 실패
+                        clearInterval(pollingInterval);
+                        alert('영상 생성에 실패했습니다: ' + (data.error || '알 수 없는 오류'));
+                        resetVideoUI();
+                    } else {
+                        // 진행 중
+                        document.getElementById('videoStatusText').textContent = 
+                            '영상 생성 중... (' + data.status + ')';
+                    }
+                }
+            } catch (error) {
+                console.error('상태 확인 오류:', error);
+            }
+        }
+        
+        function resetVideoUI() {
+            document.getElementById('generateVideoBtn').disabled = false;
+            document.getElementById('videoStatusSection').classList.add('hidden');
+            document.getElementById('videoResultSection').classList.add('hidden');
+            if (pollingInterval) {
+                clearInterval(pollingInterval);
+            }
+        }
+        
+        function closeTaskDetailModal() {
+            document.getElementById('taskDetailModal').classList.add('hidden');
+            currentEditingTask = null;
+            resetVideoUI();
         }
         
         // 작업 편집 폼 제출
