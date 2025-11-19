@@ -512,14 +512,19 @@ app.delete('/api/tasks/:id', async (c) => {
 
 // ===== 페이지 라우트 =====
 
+// 대시보드 (루트)
+app.get('/', (c) => {
+  return c.redirect('/dashboard');
+});
+
 // 업체 관리 페이지
 app.get('/brands', (c) => {
-  return c.redirect('/?type=brand');
+  return c.redirect('/clients?type=brand');
 });
 
 // 개인 관리 페이지
 app.get('/individuals', (c) => {
-  return c.redirect('/?type=individual');
+  return c.redirect('/clients?type=individual');
 });
 
 // 작업 관리 페이지
@@ -1467,8 +1472,399 @@ app.get('/tasks', (c) => {
   `);
 });
 
+// ===== 대시보드 페이지 =====
+app.get('/dashboard', (c) => {
+  return c.html(`
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StudioJuAI - 대시보드</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
+        
+        * {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            min-height: 100vh;
+        }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .sidebar {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .sidebar-item {
+            transition: all 0.2s;
+        }
+        
+        .sidebar-item:hover, .sidebar-item.active {
+            background: rgba(59, 130, 246, 0.1);
+            border-left: 3px solid #3b82f6;
+        }
+    </style>
+</head>
+<body class="font-sans">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <aside class="sidebar w-64 p-6 flex flex-col">
+            <h1 class="text-2xl font-bold text-white mb-8">StudioJuAI</h1>
+            
+            <nav class="flex-1">
+                <a href="/dashboard" class="sidebar-item active flex items-center gap-3 px-4 py-3 rounded-lg text-white mb-2">
+                    <i class="fas fa-home w-5"></i>
+                    <span>대시보드</span>
+                </a>
+                <a href="/clients" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 mb-2">
+                    <i class="fas fa-users w-5"></i>
+                    <span>고객 관리</span>
+                </a>
+                <a href="/tasks" class="sidebar-item flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 mb-2">
+                    <i class="fas fa-tasks w-5"></i>
+                    <span>작업 관리</span>
+                </a>
+            </nav>
+            
+            <button onclick="logout()" class="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-400 hover:bg-white/5 transition">
+                <i class="fas fa-sign-out-alt w-5"></i>
+                <span>로그아웃</span>
+            </button>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="flex-1 p-8 overflow-y-auto">
+            <header class="mb-8">
+                <h2 class="text-3xl font-bold text-white mb-2">대시보드</h2>
+                <p class="text-gray-400">전체 통계 및 현황을 한눈에 확인하세요</p>
+            </header>
+            
+            <!-- 통계 카드 -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="glass-card rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">전체 고객</p>
+                            <p class="text-3xl font-bold text-white mt-2" id="totalClients">0</p>
+                        </div>
+                        <div class="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-users text-blue-400 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="glass-card rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">전체 작업</p>
+                            <p class="text-3xl font-bold text-white mt-2" id="totalTasks">0</p>
+                        </div>
+                        <div class="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-clipboard-list text-purple-400 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="glass-card rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">진행 중</p>
+                            <p class="text-3xl font-bold text-yellow-400 mt-2" id="inProgressTasks">0</p>
+                        </div>
+                        <div class="w-12 h-12 bg-yellow-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-spinner text-yellow-400 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="glass-card rounded-xl p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">완료율</p>
+                            <p class="text-3xl font-bold text-green-400 mt-2" id="completionRate">0%</p>
+                        </div>
+                        <div class="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
+                            <i class="fas fa-check-circle text-green-400 text-xl"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 차트 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- 월별 작업 통계 -->
+                <div class="glass-card rounded-xl p-6">
+                    <h3 class="text-xl font-semibold text-white mb-4">월별 작업 통계</h3>
+                    <canvas id="monthlyTasksChart"></canvas>
+                </div>
+                
+                <!-- 고객 유형 분포 -->
+                <div class="glass-card rounded-xl p-6">
+                    <h3 class="text-xl font-semibold text-white mb-4">고객 유형 분포</h3>
+                    <canvas id="clientTypeChart"></canvas>
+                </div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- 작업 상태 분포 -->
+                <div class="glass-card rounded-xl p-6">
+                    <h3 class="text-xl font-semibold text-white mb-4">작업 상태 분포</h3>
+                    <canvas id="taskStatusChart"></canvas>
+                </div>
+                
+                <!-- 패키지별 통계 -->
+                <div class="glass-card rounded-xl p-6">
+                    <h3 class="text-xl font-semibold text-white mb-4">패키지별 통계</h3>
+                    <canvas id="packageChart"></canvas>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/axios@1.6.0/dist/axios.min.js"></script>
+    <script>
+        let clients = [];
+        let tasks = [];
+        
+        // 데이터 로드
+        async function loadData() {
+            try {
+                const [clientsRes, tasksRes] = await Promise.all([
+                    axios.get('/api/clients'),
+                    axios.get('/api/tasks')
+                ]);
+                
+                clients = clientsRes.data.data;
+                tasks = tasksRes.data.data;
+                
+                updateStats();
+                renderCharts();
+            } catch (error) {
+                console.error('데이터 로드 실패:', error);
+            }
+        }
+        
+        // 통계 업데이트
+        function updateStats() {
+            document.getElementById('totalClients').textContent = clients.length;
+            document.getElementById('totalTasks').textContent = tasks.length;
+            document.getElementById('inProgressTasks').textContent = tasks.filter(t => t.status === 'in_progress').length;
+            
+            const completedTasks = tasks.filter(t => t.status === 'completed').length;
+            const completionRate = tasks.length > 0 ? Math.round((completedTasks / tasks.length) * 100) : 0;
+            document.getElementById('completionRate').textContent = completionRate + '%';
+        }
+        
+        // 차트 렌더링
+        function renderCharts() {
+            renderMonthlyTasksChart();
+            renderClientTypeChart();
+            renderTaskStatusChart();
+            renderPackageChart();
+        }
+        
+        // 월별 작업 통계 차트
+        function renderMonthlyTasksChart() {
+            const monthCounts = {};
+            const currentDate = new Date();
+            
+            // 최근 6개월 초기화
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+                const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+                monthCounts[key] = 0;
+            }
+            
+            // 작업 개수 카운트
+            tasks.forEach(task => {
+                if (task.created_at) {
+                    const month = task.created_at.substring(0, 7);
+                    if (monthCounts.hasOwnProperty(month)) {
+                        monthCounts[month]++;
+                    }
+                }
+            });
+            
+            const labels = Object.keys(monthCounts).map(k => k.substring(5) + '월');
+            const data = Object.values(monthCounts);
+            
+            const ctx = document.getElementById('monthlyTasksChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '작업 수',
+                        data: data,
+                        borderColor: 'rgb(59, 130, 246)',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            labels: { color: '#fff' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#9ca3af' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        },
+                        x: {
+                            ticks: { color: '#9ca3af' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 고객 유형 분포 차트
+        function renderClientTypeChart() {
+            const brandCount = clients.filter(c => c.type === 'brand').length;
+            const individualCount = clients.filter(c => c.type === 'individual').length;
+            
+            const ctx = document.getElementById('clientTypeChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['업체', '개인'],
+                    datasets: [{
+                        data: [brandCount, individualCount],
+                        backgroundColor: [
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(168, 85, 247, 0.8)'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#fff', padding: 20 }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 작업 상태 분포 차트
+        function renderTaskStatusChart() {
+            const pending = tasks.filter(t => t.status === 'pending').length;
+            const inProgress = tasks.filter(t => t.status === 'in_progress').length;
+            const completed = tasks.filter(t => t.status === 'completed').length;
+            
+            const ctx = document.getElementById('taskStatusChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['대기 중', '진행 중', '완료'],
+                    datasets: [{
+                        label: '작업 수',
+                        data: [pending, inProgress, completed],
+                        backgroundColor: [
+                            'rgba(234, 179, 8, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(34, 197, 94, 0.8)'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#9ca3af' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                        },
+                        x: {
+                            ticks: { color: '#9ca3af' },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 패키지별 통계 차트
+        function renderPackageChart() {
+            const packageA = clients.filter(c => c.package_id === 'A').length;
+            const packageB = clients.filter(c => c.package_id === 'B').length;
+            const packageC = clients.filter(c => c.package_id === 'C').length;
+            
+            const ctx = document.getElementById('packageChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['A 패키지', 'B 패키지', 'C 패키지'],
+                    datasets: [{
+                        data: [packageA, packageB, packageC],
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.8)',
+                            'rgba(59, 130, 246, 0.8)',
+                            'rgba(34, 197, 94, 0.8)'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#fff', padding: 20 }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 로그아웃
+        function logout() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            window.location.href = 'https://studiojuai-hub.pages.dev';
+        }
+        
+        // 페이지 로드 시 실행
+        loadData();
+    </script>
+</body>
+</html>
+  `);
+});
+
 // ===== 메인 페이지 =====
-app.get('/', (c) => {
+// 고객 관리 페이지
+app.get('/clients', (c) => {
   return c.html(`
 <!DOCTYPE html>
 <html lang="ko">
