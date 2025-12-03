@@ -1847,20 +1847,28 @@ app.get('/tasks', (c) => {
         function sendToMP4Generator(taskId) {
             const task = allTasks.find(t => t.id == taskId);
             if (!task || !task.prompt) {
-                alert('프롬프트가 없습니다.');
+                alert('프롬프트가 없습니다. 먼저 프롬프트를 생성해주세요.');
                 return;
             }
             
-            // MP4 Generator URL에 프롬프트를 쿼리 파라미터로 전달
+            // MP4 Generator URL에 프롬프트 및 옵션을 쿼리 파라미터로 전달
             const mp4Url = 'https://studiojuai-mp4.pages.dev/';
             const params = new URLSearchParams({
                 prompt: task.prompt,
-                title: task.title,
-                client: task.client_name
+                title: task.title || '',
+                client: task.client_name || '',
+                ratio: '16:9',
+                autoFill: 'true'
             });
             
             // 새 탭에서 MP4 Generator 열기
-            window.open(\`\${mp4Url}?\${params.toString()}\`, '_blank');
+            window.open(mp4Url + '?' + params.toString(), '_blank');
+            
+            console.log('MP4 Generator로 전달:', {
+                prompt: task.prompt.substring(0, 50) + '...',
+                title: task.title,
+                client: task.client_name
+            });
         }
         
         // 로그아웃
@@ -2362,7 +2370,16 @@ app.get('/dashboard', (c) => {
         }
         
         // 페이지 로드 시 실행
-        loadData();
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('대시보드 로드 시작...');
+            loadData();
+        });
+        
+        // 즉시 실행 (DOMContentLoaded가 이미 발생한 경우 대비)
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            console.log('대시보드 즉시 로드...');
+            setTimeout(loadData, 100);
+        }
     </script>
 </body>
 </html>
