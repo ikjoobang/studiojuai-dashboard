@@ -1804,11 +1804,19 @@ app.get('/tasks', (c) => {
             e.preventDefault();
             
             const formData = new FormData(e.target);
-            const clientId = formData.get('client_id');
+            const clientIdStr = formData.get('client_id');
+            
+            // 고객 ID 유효성 검사
+            if (!clientIdStr || clientIdStr === '') {
+                alert('고객을 선택해주세요.');
+                return;
+            }
+            
+            const clientId = parseInt(clientIdStr, 10);
             const client = allClients.find(c => c.id === clientId);
             
             if (!client) {
-                alert('고객을 선택해주세요.');
+                alert('선택한 고객을 찾을 수 없습니다. 페이지를 새로고침 해주세요.');
                 return;
             }
             
@@ -1825,11 +1833,13 @@ app.get('/tasks', (c) => {
             try {
                 const response = await axios.post('/api/tasks', data);
                 if (response.data.success) {
+                    alert('저장 완료! 작업이 추가되었습니다.');
                     closeAddTaskModal();
                     loadData();
                 }
             } catch (error) {
-                alert('작업 추가 실패');
+                console.error('작업 추가 오류:', error);
+                alert('작업 추가 실패: ' + (error.response?.data?.message || error.message));
             }
         });
         
