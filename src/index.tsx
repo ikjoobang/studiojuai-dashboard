@@ -1710,6 +1710,15 @@ app.get('/tasks', (c) => {
                 autoFill: 'true'
             });
             
+            // 프롬프트를 클립보드에 복사
+            navigator.clipboard.writeText(prompt).then(function() {
+                // 복사 성공 알림
+                showNotification('프롬프트가 클립보드에 복사되었습니다!', 'MP4 사이트에서 Ctrl+V로 붙여넣기 하세요.', 'success');
+            }).catch(function() {
+                // 복사 실패 시에도 사이트로 이동
+                console.log('클립보드 복사 실패');
+            });
+            
             // 새 탭에서 MP4 Generator 열기
             window.open(mp4Url + '?' + params.toString(), '_blank');
             
@@ -1718,6 +1727,37 @@ app.get('/tasks', (c) => {
                 title: title,
                 client: clientName
             });
+        }
+        
+        // 알림 표시 함수
+        function showNotification(title, message, type) {
+            var notification = document.createElement('div');
+            notification.className = 'fixed top-4 right-4 p-4 rounded-lg shadow-lg z-50 max-w-sm';
+            notification.style.cssText = type === 'success' 
+                ? 'background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white;'
+                : 'background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white;';
+            notification.innerHTML = '<div class="flex items-start gap-3">' +
+                '<i class="fas fa-' + (type === 'success' ? 'check-circle' : 'info-circle') + ' text-xl mt-0.5"></i>' +
+                '<div>' +
+                    '<p class="font-bold">' + title + '</p>' +
+                    '<p class="text-sm opacity-90 mt-1">' + message + '</p>' +
+                '</div>' +
+                '<button onclick="this.parentElement.parentElement.remove()" class="ml-2 opacity-70 hover:opacity-100">' +
+                    '<i class="fas fa-times"></i>' +
+                '</button>' +
+            '</div>';
+            
+            document.body.appendChild(notification);
+            
+            // 5초 후 자동 제거
+            setTimeout(function() {
+                if (notification.parentElement) {
+                    notification.style.transition = 'opacity 0.3s, transform 0.3s';
+                    notification.style.opacity = '0';
+                    notification.style.transform = 'translateX(100%)';
+                    setTimeout(function() { notification.remove(); }, 300);
+                }
+            }, 5000);
         }
         
         // 로그아웃
