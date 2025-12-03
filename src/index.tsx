@@ -1184,79 +1184,18 @@ app.get('/tasks', (c) => {
                     <textarea id="editNotes" name="notes" placeholder="작업 관련 메모나 추가 정보를 입력하세요" class="modal-textarea w-full px-4 py-2 rounded-lg" rows="3"></textarea>
                 </div>
                 
-                <!-- 영상 생성 섹션 -->
+                <!-- 영상 생성 섹션 - MP4 사이트로 이동 -->
                 <div class="mt-6 p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl border border-purple-200">
-                    <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                    <h4 class="text-lg font-bold text-gray-900 mb-3 flex items-center">
                         <i class="fas fa-video mr-2 text-purple-600"></i>
                         MP4 영상 생성
                     </h4>
-                    
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="modal-label block text-sm mb-2">AI 모델</label>
-                            <select id="videoModel" class="modal-input w-full px-4 py-2 rounded-lg">
-                                <option value="sora-2">Sora 2 (빠름)</option>
-                                <option value="sora-2-pro">Sora 2 Pro (고품질)</option>
-                                <option value="veo-3.1">Veo 3.1</option>
-                                <option value="veo-3.1-fast">Veo 3.1 Fast</option>
-                                <option value="kling-v2.5-turbo">Kling v2.5 Turbo</option>
-                                <option value="kling-v2.5-pro">Kling v2.5 Pro</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="modal-label block text-sm mb-2">화면 비율</label>
-                            <select id="videoAspectRatio" class="modal-input w-full px-4 py-2 rounded-lg">
-                                <option value="16:9">16:9 (가로)</option>
-                                <option value="9:16">9:16 (세로)</option>
-                                <option value="1:1">1:1 (정사각형)</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label class="modal-label block text-sm mb-2">영상 길이</label>
-                            <select id="videoDuration" class="modal-input w-full px-4 py-2 rounded-lg">
-                                <option value="5">5초</option>
-                                <option value="10">10초</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="modal-label block text-sm mb-2 flex items-center">
-                                <input type="checkbox" id="videoAutoPrompt" class="mr-2">
-                                GPT 프롬프트 최적화
-                            </label>
-                        </div>
-                    </div>
-                    
-                    <div id="videoStatusSection" class="hidden mb-4 p-3 bg-white rounded-lg">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center">
-                                <i class="fas fa-spinner fa-spin text-purple-600 mr-2"></i>
-                                <span id="videoStatusText" class="text-sm font-medium text-gray-700">영상 생성 중...</span>
-                            </div>
-                            <span id="videoProgress" class="text-xs text-gray-500"></span>
-                        </div>
-                    </div>
-                    
-                    <div id="videoResultSection" class="hidden mb-4">
-                        <div class="p-3 bg-green-50 border border-green-200 rounded-lg">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm font-medium text-green-700">
-                                    <i class="fas fa-check-circle mr-2"></i>
-                                    영상 생성 완료!
-                                </span>
-                                <a id="videoDownloadLink" href="#" target="_blank" class="text-sm text-blue-600 hover:text-blue-700">
-                                    <i class="fas fa-download mr-1"></i>
-                                    다운로드
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <button type="button" id="generateVideoBtn" onclick="generateVideo()" class="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold hover:from-purple-700 hover:to-pink-700 transition shadow-lg">
-                        <i class="fas fa-magic mr-2"></i>
-                        영상 생성하기
+                    <p class="text-sm text-gray-600 mb-4">
+                        프롬프트와 함께 영상 생성 사이트로 이동합니다. 새 탭에서 영상을 생성하세요.
+                    </p>
+                    <button type="button" onclick="goToMP4Generator()" class="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold hover:from-purple-700 hover:to-pink-700 transition shadow-lg">
+                        <i class="fas fa-external-link-alt mr-2"></i>
+                        MP4 생성 사이트로 이동
                     </button>
                 </div>
                 
@@ -1588,117 +1527,9 @@ app.get('/tasks', (c) => {
         }
         
         // 영상 생성
-        let pollingInterval = null;
-        
-        async function generateVideo() {
-            if (!currentEditingTask) return;
-            
-            const prompt = document.getElementById('editPrompt').value;
-            const model = document.getElementById('videoModel').value;
-            const aspectRatio = document.getElementById('videoAspectRatio').value;
-            const duration = document.getElementById('videoDuration').value;
-            const autoPrompt = document.getElementById('videoAutoPrompt').checked;
-            
-            if (!prompt) {
-                alert('프롬프트를 먼저 입력해주세요.');
-                return;
-            }
-            
-            // UI 상태 변경
-            document.getElementById('generateVideoBtn').disabled = true;
-            document.getElementById('videoStatusSection').classList.remove('hidden');
-            document.getElementById('videoResultSection').classList.add('hidden');
-            
-            try {
-                // 영상 생성 요청
-                const response = await axios.post('/api/video/generate', {
-                    taskId: currentEditingTask.id,
-                    model: model,
-                    prompt: prompt,
-                    autoPrompt: autoPrompt,
-                    aspectRatio: aspectRatio,
-                    duration: duration
-                });
-                
-                if (response.data.success) {
-                    const videoTaskId = response.data.data.taskId;
-                    document.getElementById('videoProgress').textContent = 
-                        '예상 소요시간: ' + response.data.data.estimatedTime;
-                    
-                    // 폴링 시작 (30초마다 상태 확인)
-                    startVideoPolling(videoTaskId);
-                } else {
-                    alert('영상 생성 요청에 실패했습니다: ' + response.data.message);
-                    resetVideoUI();
-                }
-            } catch (error) {
-                console.error('영상 생성 오류:', error);
-                alert('영상 생성 중 오류가 발생했습니다.');
-                resetVideoUI();
-            }
-        }
-        
-        function startVideoPolling(videoTaskId) {
-            // 기존 폴링 제거
-            if (pollingInterval) {
-                clearInterval(pollingInterval);
-            }
-            
-            // 즉시 한 번 확인
-            checkVideoStatus(videoTaskId);
-            
-            // 30초마다 확인
-            pollingInterval = setInterval(() => {
-                checkVideoStatus(videoTaskId);
-            }, 30000);
-        }
-        
-        async function checkVideoStatus(videoTaskId) {
-            try {
-                const response = await axios.get('/api/video/status/' + videoTaskId);
-                
-                if (response.data.success) {
-                    const data = response.data.data;
-                    
-                    if (data.status === 'completed') {
-                        // 완료
-                        clearInterval(pollingInterval);
-                        document.getElementById('videoStatusSection').classList.add('hidden');
-                        document.getElementById('videoResultSection').classList.remove('hidden');
-                        document.getElementById('videoDownloadLink').href = data.videoUrl;
-                        document.getElementById('generateVideoBtn').disabled = false;
-                        
-                        // 작업 목록 새로고침
-                        loadData();
-                    } else if (data.status === 'failed') {
-                        // 실패
-                        clearInterval(pollingInterval);
-                        alert('영상 생성에 실패했습니다: ' + (data.error || '알 수 없는 오류'));
-                        resetVideoUI();
-                    } else {
-                        // 진행 중
-                        document.getElementById('videoStatusText').textContent = 
-                            '영상 생성 중... (' + data.status + ')';
-                    }
-                }
-            } catch (error) {
-                console.error('상태 확인 오류:', error);
-            }
-        }
-        
-        function resetVideoUI() {
-            document.getElementById('generateVideoBtn').disabled = false;
-            document.getElementById('videoStatusSection').classList.add('hidden');
-            document.getElementById('videoResultSection').classList.add('hidden');
-            if (pollingInterval) {
-                clearInterval(pollingInterval);
-            }
-        }
-        
         function closeTaskDetailModal() {
             document.getElementById('taskDetailModal').classList.add('hidden');
             currentEditingTask = null;
-            resetVideoUI();
         }
         
         // 작업 편집 폼 제출
@@ -1843,20 +1674,38 @@ app.get('/tasks', (c) => {
             }
         });
         
-        // MP4 Generator로 프롬프트 전송
+        // MP4 Generator로 프롬프트 전송 (작업 목록에서 호출)
         function sendToMP4Generator(taskId) {
             const task = allTasks.find(t => t.id == taskId);
             if (!task || !task.prompt) {
-                alert('프롬프트가 없습니다. 먼저 프롬프트를 생성해주세요.');
+                alert('프롬프트가 없습니다. 먼저 작업 상세에서 프롬프트를 생성해주세요.');
                 return;
             }
             
-            // MP4 Generator URL에 프롬프트 및 옵션을 쿼리 파라미터로 전달
+            openMP4Site(task.prompt, task.title, task.client_name);
+        }
+        
+        // 작업 상세 모달에서 MP4 사이트로 이동
+        function goToMP4Generator() {
+            const prompt = document.getElementById('editPrompt').value;
+            const title = document.getElementById('editTitle').value;
+            const clientName = document.getElementById('editClientName').value;
+            
+            if (!prompt || prompt.trim() === '') {
+                alert('프롬프트가 없습니다. 먼저 프롬프트를 입력하거나 재생성해주세요.');
+                return;
+            }
+            
+            openMP4Site(prompt, title, clientName);
+        }
+        
+        // MP4 사이트 열기 (공통 함수)
+        function openMP4Site(prompt, title, clientName) {
             const mp4Url = 'https://studiojuai-mp4.pages.dev/';
             const params = new URLSearchParams({
-                prompt: task.prompt,
-                title: task.title || '',
-                client: task.client_name || '',
+                prompt: prompt,
+                title: title || '',
+                client: clientName || '',
                 ratio: '16:9',
                 autoFill: 'true'
             });
@@ -1864,10 +1713,10 @@ app.get('/tasks', (c) => {
             // 새 탭에서 MP4 Generator 열기
             window.open(mp4Url + '?' + params.toString(), '_blank');
             
-            console.log('MP4 Generator로 전달:', {
-                prompt: task.prompt.substring(0, 50) + '...',
-                title: task.title,
-                client: task.client_name
+            console.log('MP4 Generator로 이동:', {
+                prompt: prompt.substring(0, 50) + '...',
+                title: title,
+                client: clientName
             });
         }
         
