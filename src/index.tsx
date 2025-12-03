@@ -12,8 +12,15 @@ type Env = {
 
 const app = new Hono<{ Bindings: Env }>()
 
-// CORS 설정
-app.use('/api/*', cors())
+// CORS 설정 - 모든 도메인 허용 (MP4 서버 연동 포함)
+app.use('/api/*', cors({
+  origin: ['https://studiojuai-dashboard.pages.dev', 'https://studiojuai-mp4.pages.dev', '*'],
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+  exposeHeaders: ['Content-Length'],
+  credentials: true,
+  maxAge: 86400
+}))
 
 // 정적 파일 서빙
 app.use('/static/*', serveStatic({ root: './public' }))
