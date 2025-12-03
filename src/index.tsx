@@ -2300,7 +2300,7 @@ app.get('/dashboard', (c) => {
             }
             
             container.innerHTML = recentTasks.map(task => 
-                '<div class="bg-white/5 rounded-lg p-4 border border-white/10 hover:bg-white/10 transition cursor-pointer" onclick="location.href=\'/tasks\'">' +
+                '<div class="bg-white/5 rounded-lg p-4 border border-white/10 hover:bg-white/10 transition cursor-pointer" onclick="goToTasks()">' +
                     '<div class="flex items-start justify-between mb-2">' +
                         '<div class="flex-1">' +
                             '<h4 class="text-white font-medium text-sm">' + task.title + '</h4>' +
@@ -2330,7 +2330,7 @@ app.get('/dashboard', (c) => {
             }
             
             container.innerHTML = recentClients.map(client => 
-                '<div class="bg-white/5 rounded-lg p-4 border border-white/10 hover:bg-white/10 transition cursor-pointer" onclick="location.href=\'/clients\'">' +
+                '<div class="bg-white/5 rounded-lg p-4 border border-white/10 hover:bg-white/10 transition cursor-pointer" onclick="goToClients()">' +
                     '<div class="flex items-start justify-between mb-2">' +
                         '<div class="flex-1">' +
                             '<h4 class="text-white font-medium text-sm">' + client.name + '</h4>' +
@@ -2360,6 +2360,15 @@ app.get('/dashboard', (c) => {
                 'completed': '완료'
             };
             return map[status] || status;
+        }
+        
+        // 페이지 이동 함수
+        function goToTasks() {
+            window.location.href = '/tasks';
+        }
+        
+        function goToClients() {
+            window.location.href = '/clients';
         }
         
         // 로그아웃
